@@ -1,7 +1,19 @@
-# ASMSG (Adaptive Semantic-aware Multi-view Sub-graph learning)
-**A Graph Neural Network for ncRNA-Drug and ncRNA-Disease Association Prediction**
+# Adaptive Self-Supervised Multimodal Graph Learning for ncRNA–Disease Association Prediction (ASMSG)
 
-This repository contains the official PyTorch implementation and datasets for predicting non-coding RNA (ncRNA) associations with drugs and diseases using a Heterogeneous Graph Neural Network (GNN).
+This repository contains the official data processing, feature extraction, and PyTorch Graph Neural Network implementation for the **ASMSG** framework, developed as part of our Final Year Design Project (FYDP) at United International University (UIU).
+
+## 👥 Authors
+* **Raad Al Ahnaf** (0112230183)
+* **Md. Abu Hojayfa Hemal** (0112310238)
+* **Abu Shalah Abdullah Alvi** (0112310001)
+* **Asma Sadia Moon** (0112310587)
+
+**Supervised by:** Dr. Riasat Azim (Assistant Professor, Dept. of CSE, UIU)
+
+## 🔬 Project Overview & Abstract
+Non-coding RNAs (ncRNA) are crucial regulators in many biological processes and are associated with various human diseases. Predicting ncRNA–disease associations accurately is of great importance for disease diagnosis, biomarker discovery, and targeted therapeutic strategies. 
+
+To address the limitations of existing computational approaches (like transductive bottlenecks and superficial multimodal integration), we propose a novel method named **Adaptive Self-Supervised Multimodal Graph Learning (ASMSG)**. This framework combines rich biological information sources into a unified graph learning architecture with an adaptive multimodal feature fusion mechanism. Additionally, we employ a cross-view self-supervised contrastive learning paradigm to leverage complementary information across different biological views, allowing us to learn robust and generalizable node representations.
 
 ## 📁 Repository Structure
 
