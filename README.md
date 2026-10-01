@@ -2,13 +2,6 @@
 
 This repository contains the official data processing, feature extraction, and PyTorch Graph Neural Network implementation for the **ASMSG** framework, developed as part of our Final Year Design Project (FYDP) at United International University (UIU).
 
-## 👥 Authors
-* **Raad Al Ahnaf** (0112230183)
-* **Md. Abu Hojayfa Hemal** (0112310238)
-* **Abu Shalah Abdullah Alvi** (0112310001)
-* **Asma Sadia Moon** (0112310587)
-
-**Supervised by:** Dr. Riasat Azim (Assistant Professor, Dept. of CSE, UIU)
 
 ## 🔬 Project Overview & Abstract
 Non-coding RNAs (ncRNA) are crucial regulators in many biological processes and are associated with various human diseases. Predicting ncRNA–disease associations accurately is of great importance for disease diagnosis, biomarker discovery, and targeted therapeutic strategies. 
