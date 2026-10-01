@@ -1,0 +1,20 @@
+# Specific User Ignored Files
+262_041.pdf
+ASMSG_Action_Plan.md
+test.py
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# IDEs and OS
+.vscode/
+.idea/
+.DS_Store
+
+# Datasets and Large Feature Matrices (Do not push gigabytes of data to GitHub)
+datasets/*
+!datasets/README.md
+!datasets/Dataset_Details.md
+features/
