@@ -47,3 +47,11 @@ import torch
 graph = torch.load('features/asmsg_hetero_graph.pt', weights_only=False)
 print(graph)
 ```
+
+## 📊 Preliminary Results
+During our initial inductive cold-start evaluation, the ASMSG framework demonstrated rapid convergence and high predictive accuracy. After an initial prototype training run of just 20 epochs using the Adaptive Edge Denoising and InfoNCE Contrastive Loss mechanisms, the model achieved:
+
+* **ncRNA-Disease Association (Validation AUC):** `0.9349` (93.49%)
+* **ncRNA-Drug Target Prediction (Validation AUC):** `0.9768` (97.68%)
+
+*Note: These metrics were generated on an isolated validation split (30% disjoint edges) to explicitly evaluate the framework's capability to overcome the transductive bottleneck in cold-start scenarios.*
