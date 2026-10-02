@@ -59,6 +59,6 @@ plt.title("ASMSG Heterogeneous Graph Sub-sample\n(Red=RNA, Blue=Disease, Green=D
 plt.axis('off')
 
 # Save to the specific artifact directory so the user can see it in chat!
-out_path = r"C:\Users\abuho\.gemini\antigravity-ide\brain\d9353bae-82ea-42de-9f66-d27771628a01\graph_visualization.png"
+out_path = r"d:\fydp\visualizer\graph_visualization.png"
 plt.savefig(out_path, dpi=300, bbox_inches='tight')
 print(f"Saved visualization to {out_path}")
