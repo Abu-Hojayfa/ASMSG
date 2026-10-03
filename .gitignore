@@ -13,4 +13,5 @@ __pycache__/
 .idea/
 .DS_Store
 
+# Datasets and Large Feature Matrices (Do not push gigabytes of data to GitHub)
 
