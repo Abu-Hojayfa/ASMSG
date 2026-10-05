@@ -14,13 +14,13 @@ This file is maintained by agents to store critical state, paths, decisions, and
 
 ## 2. Current Project State & Milestones
 
-### Phase 1: Data Engine & Topology Overhaul (✅ COMPLETED)
+### Phase 1: Data Engine & Topology Overhaul (✅ COMPLETED & PERFECTED)
 - **Source Dataset**: RNADisease v4.0 (Gold Standard) + RNAcentral + miRBase v22 + GENCODE v44 + Ensembl 110 + circBase + piRBase.
-- **Node Resolution Engine (`match_ncrna_sequences.py`)**: Multi-key sequence indexing resolved **20,973 verified human ncRNA nodes** across biotypes (74.1% miRNA, 14.6% lncRNA, 6.5% circRNA, 3.4% piRNA, 0.6% snoRNA, 0.03% tRNA), retrieving true sequences (clamped to 1,022 nt).
-- **Disease Ontology & Inheritance Engine (`build_asmsg_dataset.py`)**: Dataset-wide cross-row DO ID & MeSH inheritance increased DO ID row coverage to **211,120 association rows (89.95%)** and resolved raw disease strings into **2,749 Disease Ontology nodes** (965 DO IDs, 345 MeSH IDs, 1,439 clean string phenotypes).
-- **Continuous Edge Weighting & Score Integration**: Log-scaled **PMID evidence weights** \( w_{ij} \in (0, 1] \) and RNADisease **confidence scores** \( S_{ij} \in [0.3290, 1.0000] \) across **132,021 unique edges**.
-- **Construct Validity Specification (`CURATION_POLICY.md`)**: Created formal policy documenting species/biotype scope, deduplication rules, and the operational definition of "sequence-matched".
-- **Output Artifacts**: Master clean dataset exported to `datasets/asmsg_clean/` (`asmsg_nodes.csv`, `asmsg_diseases.csv`, `asmsg_edges.csv`, `CURATION_POLICY.md`).
+- **Node Resolution & Biotype Standardization (`match_ncrna_sequences.py`, `build_asmsg_dataset.py`)**: Multi-key sequence indexing resolved **20,973 verified human ncRNA nodes** across 6 standardized biotype classes (miRNA, lncRNA, circRNA, piRNA, snoRNA, other_ncRNA), retrieving true sequences (clamped to 1,022 nt).
+- **Synonym Disease Resolution Engine (`build_asmsg_dataset.py`)**: Dataset-wide cross-row DO ID & MeSH synonym inheritance mapped 1,761 DO IDs and 1,862 MeSH IDs, resolving 1,304 standardized Disease Ontology nodes and reducing unmapped strings to 1,380.
+- **Dual-Weighted Continuous Edge Formulation**: Formulated composite continuous edge weights \( w_{ij} = 0.5 \cdot w_{\text{PMID}} + 0.5 \cdot S_{\text{score}} \) (\( w_{ij} \in [0.2269, 0.9924] \), mean 0.3758, std 0.1599) across **129,200 unique edges**, eliminating flatline minimums.
+- **Dual Dataset Variant Export**: Exported Full Graph (`datasets/asmsg_clean/`) and High-Confidence Core Graph (`datasets/asmsg_clean_core/` with 20,559 ncRNAs, 1,304 DO/MeSH disease nodes, 121,768 edges).
+- **Construct Validity Specification (`CURATION_POLICY.md`)**: Formal policy documenting species restriction (*Homo sapiens* only), biotype consolidation, deduplication rules, and the operational definition of "sequence-matched".
 
 ### Phase 2: Multimodal Embedding Extraction & Ablation Suite (⏳ IN PROGRESS)
 - **Feature Extraction Scripts Created**: `src/features/run_rna_fm.py` (Kaggle GPU execution ready), `src/features/extract_disease_biobert.py` (Task 2.2), `src/features/extract_disease_sapbert.py` (Task 2.2b), `src/features/extract_drug_chemberta.py` (Task 2.3).

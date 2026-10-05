@@ -27,34 +27,39 @@ Existing benchmarks (SSCLMD, SSLGRDA, GSLRDA, MIFNDRA, DMGAT) derive from small,
 An empirical analysis of the exported `datasets/asmsg_clean/` dataset reveals key structural properties:
 
 ### **A. Biotype Distribution**
-While the graph contains 6 biotype classes, the edge density is heavily skewed toward miRNAs:
+To prevent ultra-sparse biotypes (e.g., tRNA with only 42 edges) from creating unstable GNN message-passing channels, rare biotypes (`tRNA`, `snRNA`, `scRNA`, `rRNA`, `pseudo`) are standardized into a consolidated `other_ncRNA` class while preserving primary sequence strings:
 - **miRNA:** 3,940 nodes | 97,825 edges (**74.1% of all edges**)
 - **lncRNA:** 6,287 nodes | 19,272 edges (14.6%)
 - **circRNA:** 6,145 nodes | 8,542 edges (6.5%)
 - **piRNA:** 3,907 nodes | 4,461 edges (3.4%)
 - **snoRNA:** 315 nodes | 829 edges (0.6%)
-- **tRNA:** 18 nodes | 42 edges (0.03%)
-- **snRNA & Others:** 361 nodes | 1,050 edges (0.8%)
+- **other_ncRNA:** 379 nodes | 1,092 edges (0.8%)
 
-### **B. Edge Weight Distribution**
-- **71.3% of edges** (94,089 out of 132,021) have `Evidence_Count = 1`, taking minimum weight `0.1248`.
-- **5.0% of edges** have `Evidence_Count ≥ 5`.
-- **1.5% of edges** have `Evidence_Count ≥ 10`.
-- Summary: `min=0.1248, median=0.1248, mean=0.1610, max=1.0000`.
+### **B. Composite Dual Edge Weight Scheme**
+To resolve flatlining where 71.3% of edges possess 1 PMID, edge weights combine PubMed literature popularity AND experimental confidence scores $S_{\text{score}} \in [0.3290, 1.0000]$:
+$$w_{ij} = 0.5 \cdot \frac{\log(1 + E_{ij})}{\max \log(1 + E_{ij})} + 0.5 \cdot S_{\text{score}}(i, j)$$
+This produces continuous edge weights with non-zero discriminative variance across all 132,021 edges.
 
 ### **C. Degree Distribution & Hubs**
 - **65.2% of ncRNA nodes** (13,678 / 20,973) have **degree = 1** (median degree = 1.0).
 - **31.6% of disease nodes** (868 / 2,749) have **degree = 1**.
 - Top disease hub (*Neoplasms / Cancer*): **8,955 connected edges**.
 
-### **D. Disease Node Normalization**
-- **965 nodes** resolved to official Disease Ontology IDs (`DOID:XXXX`).
-- **345 nodes** resolved to official MeSH IDs (`MESH:XXXX`).
-- **1,439 nodes** (52.3%) are standardized lowercase phenotype names (`NAME:clean_string`) pending further ontology alignment.
-
 ---
 
-## 3. ASMSG Clean Master Dataset (`datasets/asmsg_clean/`)
+## 3. ASMSG Dataset Export Variants
+
+The pipeline exports two distinct dataset variants:
+
+### **1. Full Graph (`datasets/asmsg_clean/`)**
+- **Nodes:** 20,973 ncRNAs, 2,749 disease terms (965 DO IDs, 345 MeSH IDs, 1,439 phenotype strings).
+- **Edges:** 132,021 dual-weighted edges ($w_{ij} \in [0.2269, 1.0000]$).
+- **Purpose:** Full-scale graph representing maximal biological coverage across all published records.
+
+### **2. High-Confidence Core Graph (`datasets/asmsg_clean_core/`)**
+- **Nodes:** 1,310 ontology-grounded disease nodes (DO IDs & MeSH IDs only) and corresponding connected ncRNAs.
+- **Edges:** High-confidence filtered subset excluding unmapped `NAME:` phenotype strings.
+- **Purpose:** Ontology-grounded benchmark for comparative validation.
 
 ### **`asmsg_nodes.csv` (ncRNA Master Table)**
 * **Count:** **20,973 sequence-matched human ncRNA nodes**

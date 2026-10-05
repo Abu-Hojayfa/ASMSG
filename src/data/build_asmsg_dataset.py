@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import numpy as np
 import pandas as pd
@@ -8,10 +9,12 @@ def build_clean_dataset():
     excel_path = os.path.join(base_dir, 'datasets', 'rnadisease_v4', 'alldata.xlsx')
     fasta_path = os.path.join(base_dir, 'datasets', 'rnadisease_v4', 'matched_sequences.fa')
     out_dir = os.path.join(base_dir, 'datasets', 'asmsg_clean')
+    core_dir = os.path.join(base_dir, 'datasets', 'asmsg_clean_core')
     
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-        
+    for d in [out_dir, core_dir]:
+        if not os.path.exists(d):
+            os.makedirs(d)
+            
     print("Loading matched sequences...")
     matched_seqs = {}
     current_name = None
@@ -41,47 +44,58 @@ def build_clean_dataset():
     print(f"Human ncRNA rows after sequence verification: {len(df_clean)}")
     
     # ----------------─────────────────────────────────────────────────────
-    # REVISED DISEASE ONTOLOGY & ENTITY RESOLUTION ENGINE
+    # ADVANCED DISEASE ONTOLOGY & SYNONYM RESOLUTION ENGINE
     # ----------------─────────────────────────────────────────────────────
-    print("\nBuilding dataset-wide Disease Ontology inheritance maps...")
+    print("\nBuilding dataset-wide Disease Ontology & Synonym inheritance maps...")
     
-    # Build dataset-wide cross-row mapping tables
     name_to_doid = {}
     name_to_mesh = {}
     doid_to_canonical_name = {}
     mesh_to_canonical_name = {}
     
+    def clean_name(s):
+        s_clean = str(s).strip().lower()
+        s_clean = re.sub(r'\s+', ' ', s_clean)
+        # Remove common trailing noise words for matching
+        s_clean = re.sub(r' (disease|syndrome|carcinoma|cancer|neoplasm)$', '', s_clean)
+        return s_clean
+        
     for _, row in df.dropna(subset=['DO ID']).iterrows():
         dname = str(row['Disease Name']).strip()
         dname_lower = dname.lower()
+        dname_c = clean_name(dname)
         doid = str(row['DO ID']).strip()
         if doid and doid.lower() not in ['nan', 'none']:
             norm_doid = doid if doid.startswith('DOID:') else f"DOID:{doid}"
             name_to_doid[dname_lower] = norm_doid
+            name_to_doid[dname_c] = norm_doid
             if norm_doid not in doid_to_canonical_name:
                 doid_to_canonical_name[norm_doid] = dname
 
     for _, row in df.dropna(subset=['MeSH ID']).iterrows():
         dname = str(row['Disease Name']).strip()
         dname_lower = dname.lower()
+        dname_c = clean_name(dname)
         mesh = str(row['MeSH ID']).strip()
         if mesh and mesh.lower() not in ['nan', 'none']:
             norm_mesh = mesh if mesh.startswith('MESH:') else f"MESH:{mesh}"
             name_to_mesh[dname_lower] = norm_mesh
+            name_to_mesh[dname_c] = norm_mesh
             if norm_mesh not in mesh_to_canonical_name:
                 mesh_to_canonical_name[norm_mesh] = dname
 
-    print(f" - Mapped {len(name_to_doid)} disease names to official DO IDs.")
-    print(f" - Mapped {len(name_to_mesh)} disease names to official MeSH IDs.")
+    print(f" - Mapped {len(name_to_doid)} disease names/synonyms to official DO IDs.")
+    print(f" - Mapped {len(name_to_mesh)} disease names/synonyms to official MeSH IDs.")
     
     def resolve_disease(row):
         dname = str(row['Disease Name']).strip()
         dname_lower = dname.lower()
+        dname_c = clean_name(dname)
         
         # 1. Primary: DO ID (explicit or dataset-inherited)
         doid = str(row['DO ID']).strip() if pd.notnull(row['DO ID']) else ""
         if not doid or doid.lower() in ['nan', 'none']:
-            doid = name_to_doid.get(dname_lower, "")
+            doid = name_to_doid.get(dname_lower, name_to_doid.get(dname_c, ""))
         else:
             doid = doid if doid.startswith('DOID:') else f"DOID:{doid}"
             
@@ -92,7 +106,7 @@ def build_clean_dataset():
         # 2. Secondary: MeSH ID (explicit or dataset-inherited)
         mesh = str(row['MeSH ID']).strip() if pd.notnull(row['MeSH ID']) else ""
         if not mesh or mesh.lower() in ['nan', 'none']:
-            mesh = name_to_mesh.get(dname_lower, "")
+            mesh = name_to_mesh.get(dname_lower, name_to_mesh.get(dname_c, ""))
         else:
             mesh = mesh if mesh.startswith('MESH:') else f"MESH:{mesh}"
             
@@ -110,12 +124,33 @@ def build_clean_dataset():
     df_clean['Resolved_MeSH_ID'] = [r[3] for r in resolved_records]
     
     # ----------------─────────────────────────────────────────────────────
-    # OUTPUT MASTER CSV TABLES
+    # BIOTYPE STANDARDIZATION
+    # ----------------─────────────────────────────────────────────────────
+    def standardize_biotype(btype):
+        b = str(btype).strip()
+        b_lower = b.lower()
+        if 'mirna' in b_lower:
+            return 'miRNA'
+        if 'lncrna' in b_lower:
+            return 'lncRNA'
+        if 'circrna' in b_lower:
+            return 'circRNA'
+        if 'pirna' in b_lower:
+            return 'piRNA'
+        if 'snorna' in b_lower:
+            return 'snoRNA'
+        return 'other_ncRNA'
+        
+    df_clean['Standardized_RNA_Type'] = df_clean['RNA Type'].apply(standardize_biotype)
+    
+    # ----------------─────────────────────────────────────────────────────
+    # OUTPUT MASTER CSV TABLES (asmsg_clean/)
     # ----------------─────────────────────────────────────────────────────
     
     # 1. Build Nodes CSV (ncRNA Master Table)
     print("\nBuilding asmsg_nodes.csv...")
-    node_data = df_clean.drop_duplicates(subset=['RNA Symbol'])[['RNA Symbol', 'RNA Type']].copy()
+    node_data = df_clean.drop_duplicates(subset=['RNA Symbol'])[['RNA Symbol', 'Standardized_RNA_Type']].copy()
+    node_data.rename(columns={'Standardized_RNA_Type': 'RNA Type'}, inplace=True)
     node_data['Sequence'] = node_data['RNA Symbol'].map(matched_seqs)
     node_data['Seq_Length'] = node_data['Sequence'].str.len()
     node_file = os.path.join(out_dir, 'asmsg_nodes.csv')
@@ -132,8 +167,8 @@ def build_clean_dataset():
     disease_file = os.path.join(out_dir, 'asmsg_diseases.csv')
     disease_group.to_csv(disease_file, index=False)
     
-    # 3. Build Edges CSV with PMID Evidence Weighting
-    print("Building asmsg_edges.csv with continuous PMID evidence weighting...")
+    # 3. Build Edges CSV with Dual Continuous Evidence Weighting
+    print("Building asmsg_edges.csv with dual PMID & confidence score weighting...")
     
     def process_pmids(series):
         pmids = set()
@@ -176,23 +211,43 @@ def build_clean_dataset():
         
     edge_df = pd.DataFrame(edge_summary)
     
-    # Compute continuous log-scaled edge weights: w_ij = log(1 + E_ij) / max(log(1 + E_ij))
+    # Dual continuous weight formula: w_ij = 0.5 * w_PMID + 0.5 * Confidence_Score
     max_log_ev = np.log1p(edge_df['Evidence_Count'].max())
-    edge_df['Edge_Weight'] = (np.log1p(edge_df['Evidence_Count']) / max_log_ev).round(4)
+    pmid_weight = np.log1p(edge_df['Evidence_Count']) / max_log_ev
+    edge_df['Edge_Weight'] = (0.5 * pmid_weight + 0.5 * edge_df['Confidence_Score']).round(4)
     
     edge_file = os.path.join(out_dir, 'asmsg_edges.csv')
     edge_df.to_csv(edge_file, index=False)
     
+    # ----------------─────────────────────────────────────────────────────
+    # BUILD HIGH-CONFIDENCE CORE GRAPH VARIANT (asmsg_clean_core/)
+    # ----------------─────────────────────────────────────────────────────
+    print("\nBuilding high-confidence core dataset variant (asmsg_clean_core/)...")
+    
+    # Core filter: Exclude unmapped NAME: disease nodes
+    core_disease_ids = set(disease_group[~disease_group['Disease_ID'].str.startswith('NAME:')]['Disease_ID'])
+    core_edges_df = edge_df[edge_df['Disease_ID'].isin(core_disease_ids)].copy()
+    
+    core_rna_symbols = set(core_edges_df['RNA Symbol'].unique())
+    core_nodes_df = node_data[node_data['RNA Symbol'].isin(core_rna_symbols)].copy()
+    core_diseases_df = disease_group[disease_group['Disease_ID'].isin(core_disease_ids)].copy()
+    
+    core_nodes_df.to_csv(os.path.join(core_dir, 'asmsg_nodes.csv'), index=False)
+    core_diseases_df.to_csv(os.path.join(core_dir, 'asmsg_diseases.csv'), index=False)
+    core_edges_df.to_csv(os.path.join(core_dir, 'asmsg_edges.csv'), index=False)
+    
     print("\n" + "="*50)
-    print("ASMSG REVISED DATASET CONSTRUCTION COMPLETE!")
-    print(f"Unique ncRNA Nodes: {len(node_data)}")
-    print(f"Unique Standardized Disease Nodes: {len(disease_group)}")
-    print(f" - DO ID Nodes: {len(disease_group[disease_group['Disease_ID'].str.startswith('DOID')])}")
-    print(f" - MeSH Nodes: {len(disease_group[disease_group['Disease_ID'].str.startswith('MESH')])}")
-    print(f" - Isolated Name Nodes: {len(disease_group[disease_group['Disease_ID'].str.startswith('NAME')])}")
-    print(f"Unique ncRNA-Disease Edges: {len(edge_df)}")
-    print(f"Max Evidence Count for single edge: {edge_df['Evidence_Count'].max()}")
-    print(f"Saved to: {out_dir}")
+    print("ASMSG REVISED DATASET RE-CONSTRUCTION COMPLETE!")
+    print(f"FULL GRAPH (asmsg_clean/):")
+    print(f" - ncRNA Nodes: {len(node_data)}")
+    print(f" - Disease Nodes: {len(disease_group)} (DOID: {len(disease_group[disease_group['Disease_ID'].str.startswith('DOID:')])}, MeSH: {len(disease_group[disease_group['Disease_ID'].str.startswith('MESH:')])}, NAME: {len(disease_group[disease_group['Disease_ID'].str.startswith('NAME:')])})")
+    print(f" - Edges: {len(edge_df)}")
+    print(f" - Edge Weights Mean: {edge_df['Edge_Weight'].mean():.4f}, Std: {edge_df['Edge_Weight'].std():.4f}, Min: {edge_df['Edge_Weight'].min():.4f}, Max: {edge_df['Edge_Weight'].max():.4f}")
+    
+    print(f"\nCORE GRAPH (asmsg_clean_core/):")
+    print(f" - ncRNA Nodes: {len(core_nodes_df)}")
+    print(f" - Standardized Disease Nodes: {len(core_diseases_df)}")
+    print(f" - High-Confidence Edges: {len(core_edges_df)}")
     print("="*50)
 
 if __name__ == "__main__":
