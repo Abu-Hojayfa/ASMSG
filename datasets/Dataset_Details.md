@@ -13,7 +13,7 @@ To establish state-of-the-art (SOTA) publication novelty for peer review (*Bioin
 | **Primary Journal** | *IEEE/ACM TCBB* | *Brief. Bioinform.* | *Comput. Biol. Med.* | *Comput. Biol. Med.* | *IEEE JBHI* | **This Work** |
 | **Biotype Scope** | miRNA only | miRNA + lncRNA | miRNA + lncRNA | miRNA only | miRNA only | **All 6 ncRNA Biotypes (miRNA, lncRNA, circRNA, piRNA, snoRNA, tRNA)** |
 | **Verified ncRNA Nodes** | 853 | 1,002 | 852 | 788 | 853 | **20,973 verified sequence nodes** |
-| **Disease Scope** | 591 raw strings | 590 raw strings | 591 raw strings | 441 raw strings | 591 raw strings | **2,749 DO ID / MeSH standardized terms** |
+| **Disease Scope** | 591 raw strings | 590 raw strings | 591 raw strings | 441 raw strings | 591 raw strings | **2,749 DO ID / MeSH standardized terms (89.95% DOID row coverage)** |
 | **Unique Edge Count** | 5,424 binary (0/1) | 9,122 binary (0/1) | 5,424 binary (0/1) | 5,149 binary (0/1) | 5,424 binary (0/1) | **132,021 unique edges (from 234,698 literature records)** |
 | **Edge Weight Scheme** | Unweighted binary | Unweighted binary | Unweighted binary | Unweighted binary | Unweighted binary | **Continuous PMID evidence weights \( w_{ij} \in (0, 1] \)** |
 | **Sequence Encoding** | k-mer (3-mer) | None | None | Sequence length | None | **RNA-FM Foundation Model (640d contextual embeddings)** |
@@ -35,10 +35,10 @@ To establish state-of-the-art (SOTA) publication novelty for peer review (*Bioin
 
 ### **`asmsg_diseases.csv` (Disease Master Table)**
 * **Count:** **2,749 standardized Disease Ontology nodes**
-* **Source:** Disease Ontology (DO ID) and Medical Subject Headings (MeSH).
+* **Resolution Engine:** Cross-row DO ID & MeSH inheritance mapped 1,381 unique disease strings to DO IDs and 1,514 strings to MeSH IDs, raising DO ID row coverage to **211,120 association rows (89.95%)**.
 * **Columns:**
-  1. `Disease_ID`: Standardized ontology key (e.g., `DOID:1612`, `MESH:D001943`, `NAME:breast carcinoma`).
-  2. `Disease_Name`: Primary clinical condition name.
+  1. `Disease_ID`: Standardized ontology key (`DOID:XXXXX`, `MESH:XXXXX`, `NAME:clean_phenotype`).
+  2. `Disease_Name`: Primary canonical clinical condition name.
   3. `DO_ID`: Official Disease Ontology identifier.
   4. `MeSH_ID`: Official MeSH CUI identifier.
   5. `Total_Edges`: Number of verified ncRNA association edges attached to this disease node.
@@ -64,7 +64,10 @@ To establish state-of-the-art (SOTA) publication novelty for peer review (*Bioin
 Out of 61,947 candidate RNA symbols in RNADisease v4, multi-key sequence indexing successfully retrieved verified biological sequences for 20,973 ncRNAs (**33.86% matching rate**, retaining **81.8% of total association records**).  
 The remaining unmapped candidate symbols are unannotated high-throughput transcript IDs or deprecated aliases that lack entry in gold-standard genomic reference databases. Retaining nodes without sequence data would force zero-padding or random noise initialization, corrupting Transformer embedding space.
 
-### **B. PMID Evidence-Weighted Negative Sampling**
+### **B. Disease Entity Normalization & 89.95% DOID Row Coverage**
+By constructing dataset-wide mapping dictionaries, raw disease string variants (*"breast cancer"*, *"breast carcinoma"*, *"breast malignant neoplasm"*) inherit canonical Disease Ontology IDs (`DOID:1612`), resolving string fragmentation and boosting DO ID coverage from 68% to 89.95% across all 234,698 literature rows.
+
+### **C. PMID Evidence-Weighted Negative Sampling**
 RNADisease v4 contains exclusively validated positive associations. To prevent false-negative bias during model training, ASMSG employs **evidence-weighted negative sampling**, selecting unobserved (ncRNA, Disease) pairs primarily from entity combinations with zero PubMed literature co-mentions and low topological similarity.
 
 ---

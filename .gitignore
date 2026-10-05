@@ -15,6 +15,7 @@ __pycache__/
 # Datasets and Large Feature Matrices
 # (Keep all raw data, sequence databases, and extracted embeddings entirely private)
 datasets/
+!datasets/*.md
 features/
 *.npy
 *.pt
