@@ -8,16 +8,17 @@ This file is maintained by agents to store critical state, paths, and decisions.
 - **Code Structure**: Store Python source code in `d:\fydp\src\`. Feature extractors are in `d:\fydp\src\features\`, graph building logic in `d:\fydp\src\graph\`, etc.
 
 ## 2. Current Project State
-- **Phase 1: Data Collection (✅ Completed)**
-  - All datasets successfully downloaded and stored in `d:\fydp\datasets\`.
-  - HMDD v4.0, ncRNADrug, miRBase FASTA, and PubChem drug SMILES are ready.
-- **Phase 2: Multimodal Feature Extraction (✅ Completed)**
-  - 640-dim embeddings for RNA extracted using RNA-FM. Saved in `d:\fydp\features\rna_features_rnafm.npy`.
-  - 384-dim embeddings for Drugs extracted using ChemBERTa-2. Saved in `d:\fydp\features\drug_features_chemberta.npy`.
-- **Phase 3: Heterogeneous Graph Construction (✅ Completed)**
-  - PyG `HeteroData` object successfully built and saved to `d:\fydp\features\asmsg_hetero_graph.pt`.
+- **Phase 1: Data Collection (⚠️ Needs Update)**
+  - Existing datasets: HMDD v4.0, ncRNADrug, miRBase FASTA, and PubChem drug SMILES.
+  - **NEW GOAL**: Integrate **RNADisease v4.0** (to replace/supplement HMDD and LncRNADisease) and download bulk sequences from **RNAcentral** to achieve TRUE ncRNA coverage (miRNAs, lncRNAs, circRNAs, piRNAs, snoRNAs).
+- **Phase 2: Multimodal Feature Extraction (⚠️ Needs Update)**
+  - Current: 640-dim embeddings for 1,203 miRNAs using RNA-FM.
+  - **NEW GOAL**: Expand to extract RNA-FM embeddings for lncRNAs and circRNAs (truncating >1024nt seqs).
+  - Current: 384-dim embeddings for Drugs using ChemBERTa-2 (Completed).
+- **Phase 3: Heterogeneous Graph Construction (⚠️ Needs Update)**
+  - Current PyG `HeteroData` is miRNA-biased. Needs rebuilding to include lncRNA/circRNA nodes and their respective edges, plus disease name normalization.
 - **Phase 4: Core ASMSG Model Implementation (⏳ In Progress)**
-  - Writing the Dual-View Graph Neural Network architecture in PyTorch.
+  - Writing the Dual-View Graph Neural Network architecture in PyTorch, adapting contrastive learning for scaled node counts.
 
 ## 3. Tech Stack & Dependencies (Installed in venv)
 - `torch`, `torch-geometric` (PyG)
@@ -26,6 +27,6 @@ This file is maintained by agents to store critical state, paths, and decisions.
 - `rna-fm` (for RNA sequences)
 
 ## 4. Graph Architecture Notes
-- **Nodes**: ncRNA, Disease, Drug.
-- **Edges**: ncRNA-Disease (HMDD, LncRNADisease), ncRNA-Drug (ncRNADrug).
-- **Features**: RNA-FM embeddings for RNAs, ChemBERTa-2 embeddings for Drugs, Semantic similarities for Diseases.
+- **Nodes**: ncRNA (multi-type: miRNA, lncRNA, circRNA), Disease, Drug.
+- **Edges**: ncRNA-Disease (from RNADisease v4.0, HMDD, LncRNADisease), ncRNA-Drug (from ncRNADrug).
+- **Features**: RNA-FM embeddings for ALL ncRNAs (sourced from miRBase + RNAcentral), ChemBERTa-2 embeddings for Drugs, Semantic similarities for Diseases.
