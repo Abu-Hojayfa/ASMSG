@@ -8,90 +8,60 @@ This document provides the definitive specification of the **ASMSG Clean** maste
 
 Existing benchmarks (SSCLMD, SSLGRDA, GSLRDA, MIFNDRA, DMGAT) derive from small, inherited miRNA-dominated datasets evaluated predominantly under standard transductive 5-fold cross-validation. ASMSG Clean expands the topological and biotype scope while introducing leakage-controlled inductive cold-start evaluation:
 
-| Feature / Metric | **SSCLMD** (2023) | **SSLGRDA** (2024) | **GSLRDA** (2024) | **MIFNDRA** (2023) | **DMGAT** (2024) | **ASMSG Clean (Ours)** |
+| Feature / Metric | **SSCLMD** (2023) | **SSLGRDA** (2024) | **GSLRDA** (2024) | **MIFNDRA** (2023) | **DMGAT** (2024) | **ASMSG Clean (Ours — Option B)** |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Primary Journal** | *IEEE/ACM TCBB* | *Brief. Bioinform.* | *Comput. Biol. Med.* | *Comput. Biol. Med.* | *IEEE JBHI* | **This Work** |
-| **Biotype Scope** | miRNA only | miRNA + lncRNA | miRNA + lncRNA | miRNA only | miRNA only | **Spanning 6 Biotypes (74.1% miRNA, 14.6% lncRNA, 6.5% circRNA, 3.4% piRNA, 0.6% snoRNA, 0.03% tRNA)** |
-| **Sequence-Matched Nodes** | 853 | 1,002 | 852 | 788 | 853 | **20,973 sequence-matched nodes** |
-| **Disease Scope** | 591 raw strings | 590 raw strings | 591 raw strings | 441 raw strings | 591 raw strings | **2,749 Disease Nodes (965 DO IDs, 345 MeSH IDs, 1,439 clean string phenotypes; 89.95% DOID row coverage)** |
-| **Unique Edge Count** | 5,424 binary (0/1) | 9,122 binary (0/1) | 5,424 binary (0/1) | 5,149 binary (0/1) | 5,424 binary (0/1) | **132,021 unique edges (derived from 234,698 literature records)** |
-| **Edge Weight Scheme** | Unweighted binary | Unweighted binary | Unweighted binary | Unweighted binary | Unweighted binary | **Continuous PMID evidence weights \( w_{ij} \in (0, 1] \) & confidence scores** |
-| **Sequence Feature Vectors** | k-mer (3-mer) | None | None | Sequence length | None | **RNA-FM Contextual Embeddings (640d) + 3-mer / One-hot / Length Ablations** |
+| **Biotype Scope** | miRNA only | miRNA + lncRNA | miRNA + lncRNA | miRNA only | miRNA only | **Spanning 6 Biotypes (74.1% miRNA, 14.6% lncRNA, 6.5% circRNA, 3.4% piRNA, 0.6% snoRNA, 0.8% other_ncRNA)** |
+| **Sequence-Matched Nodes** | 853 | 1,002 | 852 | 788 | 853 | **20,559 sequence-matched nodes** |
+| **Disease Scope** | 591 raw strings | 590 raw strings | 591 raw strings | 441 raw strings | 591 raw strings | **1,304 Standardized Disease Nodes (965 DO IDs, 339 MeSH IDs; 100% Ontology Curated, 0 Raw Strings)** |
+| **Unique Edge Count** | 5,424 binary (0/1) | 9,122 binary (0/1) | 5,424 binary (0/1) | 5,149 binary (0/1) | 5,424 binary (0/1) | **121,768 unique edges (derived from 234,698 literature records)** |
+| **Edge Weight Scheme** | Unweighted binary | Unweighted binary | Unweighted binary | Unweighted binary | Unweighted binary | **Composite Dual Weights \( w_{ij} = 0.5 w_{\text{PMID}} + 0.5 S_{\text{score}} \) ($w_{ij} \in [0.2269, 0.9924]$)** |
+| **Sequence Feature Vectors** | k-mer (3-mer) | None | None | Sequence length | None | **RNA-FM Contextual Embeddings (640d, Head-Tail Clamping) + 3-mer / One-hot / Length Ablations** |
 | **Disease Feature Vectors** | MeSH tree | None | Disease semantic | MeSH semantic | None | **BioBERT (768d) + SapBERT (768d) Semantic Embeddings** |
 | **Evaluation Paradigm** | Transductive 5-fold | Transductive 5-fold | Transductive 5-fold | Transductive 5-fold | Transductive 5-fold | **Identity-Clustered & Hierarchy-Aware Disjoint Inductive Cold-Start (S-S, U-S, S-U, U-U) + Temporal Validation** |
 
 ---
 
-## 2. Empirical Graph Statistics & Distributions
+## 2. Empirical Graph Statistics & Distributions (`datasets/asmsg_clean/`)
 
-An empirical analysis of the exported `datasets/asmsg_clean/` dataset reveals key structural properties:
+An empirical analysis of the exported Option B master dataset reveals key structural properties:
 
 ### **A. Biotype Distribution**
 To prevent ultra-sparse biotypes (e.g., tRNA with only 42 edges) from creating unstable GNN message-passing channels, rare biotypes (`tRNA`, `snRNA`, `scRNA`, `rRNA`, `pseudo`) are standardized into a consolidated `other_ncRNA` class while preserving primary sequence strings:
-- **miRNA:** 3,940 nodes | 97,825 edges (**74.1% of all edges**)
-- **lncRNA:** 6,287 nodes | 19,272 edges (14.6%)
-- **circRNA:** 6,145 nodes | 8,542 edges (6.5%)
-- **piRNA:** 3,907 nodes | 4,461 edges (3.4%)
-- **snoRNA:** 315 nodes | 829 edges (0.6%)
-- **other_ncRNA:** 379 nodes | 1,092 edges (0.8%)
+- **lncRNA:** 6,211 nodes
+- **circRNA:** 5,908 nodes
+- **piRNA:** 3,888 nodes
+- **miRNA:** 3,861 nodes
+- **other_ncRNA:** 376 nodes
+- **snoRNA:** 315 nodes
 
 ### **B. Composite Dual Edge Weight Scheme**
 To resolve flatlining where 71.3% of edges possess 1 PMID, edge weights combine PubMed literature popularity AND experimental confidence scores $S_{\text{score}} \in [0.3290, 1.0000]$:
 $$w_{ij} = 0.5 \cdot \frac{\log(1 + E_{ij})}{\max \log(1 + E_{ij})} + 0.5 \cdot S_{\text{score}}(i, j)$$
-This produces continuous edge weights with non-zero discriminative variance across all 132,021 edges.
+This produces continuous edge weights ($w_{ij} \in [0.2269, 0.9924]$, mean $0.3772$) across all 121,768 edges.
 
-### **C. Degree Distribution & Hubs**
-- **65.2% of ncRNA nodes** (13,678 / 20,973) have **degree = 1** (median degree = 1.0).
-- **31.6% of disease nodes** (868 / 2,749) have **degree = 1**.
-- Top disease hub (*Neoplasms / Cancer*): **8,955 connected edges**.
+### **C. Inter-ncRNA Sequence Similarity Topology**
+To resolve degree skew where 65.3% of ncRNAs connect to a single disease, ASMSG constructs supplementary `(ncRNA, sequence_similar_to, ncRNA)` topological edges (`ncrna_sequence_similarity_edges.csv`) based on 3-mer k-mer frequency cosine similarity ($\ge 0.85$). This connects leaf ncRNAs to sequence-similar neighbors.
 
 ---
 
-## 3. ASMSG Dataset Export Variants
-
-The pipeline exports two distinct dataset variants:
-
-### **1. Full Graph (`datasets/asmsg_clean/`)**
-- **Nodes:** 20,973 ncRNAs, 2,749 disease terms (965 DO IDs, 345 MeSH IDs, 1,439 phenotype strings).
-- **Edges:** 132,021 dual-weighted edges ($w_{ij} \in [0.2269, 1.0000]$).
-- **Purpose:** Full-scale graph representing maximal biological coverage across all published records.
-
-### **2. High-Confidence Core Graph (`datasets/asmsg_clean_core/`)**
-- **Nodes:** 1,310 ontology-grounded disease nodes (DO IDs & MeSH IDs only) and corresponding connected ncRNAs.
-- **Edges:** High-confidence filtered subset excluding unmapped `NAME:` phenotype strings.
-- **Purpose:** Ontology-grounded benchmark for comparative validation.
+## 3. ASMSG Master Dataset Specifications (`datasets/asmsg_clean/`)
 
 ### **`asmsg_nodes.csv` (ncRNA Master Table)**
-* **Count:** **20,973 sequence-matched human ncRNA nodes**
+* **Count:** **20,559 sequence-matched human ncRNA nodes**
 * **Source Databases:** miRBase v22, GENCODE v44, Ensembl 110, circBase, piRBase.
-* **Columns:**
-  1. `RNA Symbol`: Standardized gene symbol or accession ID.
-  2. `RNA Type`: Biotype class (`miRNA`, `lncRNA`, `circRNA`, `piRNA`, `snoRNA`, `tRNA`, `snRNA`, `rRNA`).
-  3. `Sequence`: Verified nucleotide sequence string (RNA format 'U', clamped to max 1,022 nt).
-  4. `Seq_Length`: Sequence length in nucleotides (nt).
+* **Sequence Clamping:** Head-Tail dual-window clamping (first 511 nt + last 511 nt) for transcripts $>1,022$ nt.
 
-### **`asmsg_diseases.csv` (Disease Master Table)**
-* **Count:** **2,749 Disease Ontology & Phenotype nodes**
-* **Resolution Engine:** Cross-row DO ID & MeSH inheritance mapped 1,381 unique disease strings to DO IDs and 1,514 strings to MeSH IDs, raising DO ID row coverage to **211,120 association rows (89.95%)**.
-* **Columns:**
-  1. `Disease_ID`: Standardized ontology key (`DOID:XXXXX`, `MESH:XXXXX`, `NAME:clean_phenotype`).
-  2. `Disease_Name`: Primary canonical clinical condition name.
-  3. `DO_ID`: Official Disease Ontology identifier.
-  4. `MeSH_ID`: Official MeSH CUI identifier.
-  5. `Total_Edges`: Number of ncRNA association edges attached to this disease node.
+### **`asmsg_diseases.csv` (Disease Master Table — 100% Curated)**
+* **Count:** **1,304 Standardized Disease Ontology & MeSH nodes (0 Unmapped Strings)**
+* **Resolution Engine:** Cross-row DO ID & MeSH synonym inheritance mapped 1,761 DO IDs and 1,862 MeSH IDs, raising ontology row coverage to **100%**.
 
 ### **`asmsg_edges.csv` (Continuous Evidence Edge Table)**
-* **Count:** **132,021 unique association edges** (constructed from 234,698 literature association records in RNADisease v4.0).
-* **PMID Evidence Weighting Formula:**
-  Continuous edge weights \( w_{ij} \in (0, 1] \) are computed via logarithmic scaling:
-  $$w_{ij} = \frac{\log(1 + E_{ij})}{\max \log(1 + E_{ij})}$$
-  where \( E_{ij} \) is the count of independent literature PubMed citations supporting the edge.
-* **Columns:**
-  1. `RNA Symbol`: Source ncRNA node symbol.
-  2. `Disease_ID`: Target Disease node ontology ID.
-  3. `Evidence_Count`: Number of supporting PubMed literature citations \( E_{ij} \) (max single edge = 257 PMIDs).
-  4. `PMID_List`: Semicolon-separated list of supporting PubMed IDs.
-  5. `Edge_Weight`: Continuous log-scaled weight \( w_{ij} \).
+* **Count:** **121,768 unique association edges**
+* **Columns:** `RNA Symbol`, `Disease_ID`, `Evidence_Count`, `PMID_List`, `Confidence_Score`, `Edge_Weight`.
+
+### **`ncrna_sequence_similarity_edges.csv` (ncRNA Similarity Topology Table)**
+* **Columns:** `RNA_Symbol_1`, `RNA_Symbol_2`, `Similarity_Score` ($\ge 0.85$).
 
 ---
 

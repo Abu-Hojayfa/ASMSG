@@ -1,19 +1,88 @@
 import os
 import re
 import json
+import itertools
 import numpy as np
 import pandas as pd
+
+def compute_head_tail_clamping(seq, max_len=1022):
+    """
+    Clamps long RNA sequences while preserving both 5'-end seed region and 3'-end regulatory domain.
+    If len(seq) > 1022, takes first 511 nt + last 511 nt.
+    """
+    seq_str = str(seq).upper().replace('T', 'U')
+    if len(seq_str) <= max_len:
+        return seq_str
+    half = max_len // 2
+    return seq_str[:half] + seq_str[-half:]
+
+def compute_3mer_similarity_edges(node_data, threshold=0.85, top_k=5):
+    """
+    Computes sequence similarity edges between ncRNAs based on 3-mer frequency cosine similarity
+    to connect degree-1 leaf nodes and enrich graph topology.
+    """
+    print("\nComputing 3-mer sequence similarity edges among ncRNAs...")
+    nucleotides = ['A', 'C', 'G', 'U']
+    kmers = [''.join(p) for p in itertools.product(nucleotides, repeat=3)]
+    kmer_to_idx = {k: i for i, k in enumerate(kmers)}
+    
+    sequences = node_data['Sequence'].tolist()
+    symbols = node_data['RNA Symbol'].tolist()
+    matrix = np.zeros((len(sequences), len(kmers)), dtype=np.float32)
+    
+    for row_idx, seq in enumerate(sequences):
+        seq_clean = seq.upper().replace('T', 'U')
+        seq_len = len(seq_clean)
+        if seq_len < 3:
+            continue
+        counts = {}
+        for i in range(seq_len - 2):
+            kmer = seq_clean[i : i + 3]
+            if kmer in kmer_to_idx:
+                counts[kmer] = counts.get(kmer, 0) + 1
+        total = sum(counts.values())
+        if total > 0:
+            for kmer, cnt in counts.items():
+                matrix[row_idx, kmer_to_idx[kmer]] = cnt / total
+                
+    # Normalize rows for cosine similarity
+    norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    norm_matrix = matrix / norms
+    
+    sim_edges = []
+    chunk_size = 2000
+    for i in range(0, len(symbols), chunk_size):
+        chunk = norm_matrix[i : i + chunk_size]
+        sim_chunk = np.dot(chunk, norm_matrix.T)
+        
+        for r_local in range(len(chunk)):
+            r_global = i + r_local
+            sim_scores = sim_chunk[r_local]
+            sim_scores[r_global] = 0.0 # Zero self-similarity
+            
+            top_indices = np.argsort(sim_scores)[-top_k:]
+            for target_idx in top_indices:
+                score = sim_scores[target_idx]
+                if score >= threshold:
+                    sim_edges.append({
+                        'RNA_Symbol_1': symbols[r_global],
+                        'RNA_Symbol_2': symbols[target_idx],
+                        'Similarity_Score': round(float(score), 4)
+                    })
+                    
+    sim_df = pd.DataFrame(sim_edges).drop_duplicates()
+    print(f" - Generated {len(sim_df)} ncRNA-ncRNA sequence similarity edges (threshold >= {threshold}).")
+    return sim_df
 
 def build_clean_dataset():
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     excel_path = os.path.join(base_dir, 'datasets', 'rnadisease_v4', 'alldata.xlsx')
     fasta_path = os.path.join(base_dir, 'datasets', 'rnadisease_v4', 'matched_sequences.fa')
     out_dir = os.path.join(base_dir, 'datasets', 'asmsg_clean')
-    core_dir = os.path.join(base_dir, 'datasets', 'asmsg_clean_core')
     
-    for d in [out_dir, core_dir]:
-        if not os.path.exists(d):
-            os.makedirs(d)
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
             
     print("Loading matched sequences...")
     matched_seqs = {}
@@ -44,7 +113,7 @@ def build_clean_dataset():
     print(f"Human ncRNA rows after sequence verification: {len(df_clean)}")
     
     # ----------------─────────────────────────────────────────────────────
-    # ADVANCED DISEASE ONTOLOGY & SYNONYM RESOLUTION ENGINE
+    # STRICT ONTOLOGY DISEASE RESOLUTION (DO ID & MeSH ONLY — OPTION B)
     # ----------------─────────────────────────────────────────────────────
     print("\nBuilding dataset-wide Disease Ontology & Synonym inheritance maps...")
     
@@ -56,7 +125,6 @@ def build_clean_dataset():
     def clean_name(s):
         s_clean = str(s).strip().lower()
         s_clean = re.sub(r'\s+', ' ', s_clean)
-        # Remove common trailing noise words for matching
         s_clean = re.sub(r' (disease|syndrome|carcinoma|cancer|neoplasm)$', '', s_clean)
         return s_clean
         
@@ -84,10 +152,7 @@ def build_clean_dataset():
             if norm_mesh not in mesh_to_canonical_name:
                 mesh_to_canonical_name[norm_mesh] = dname
 
-    print(f" - Mapped {len(name_to_doid)} disease names/synonyms to official DO IDs.")
-    print(f" - Mapped {len(name_to_mesh)} disease names/synonyms to official MeSH IDs.")
-    
-    def resolve_disease(row):
+    def resolve_disease_strict(row):
         dname = str(row['Disease Name']).strip()
         dname_lower = dname.lower()
         dname_c = clean_name(dname)
@@ -114,50 +179,61 @@ def build_clean_dataset():
             canonical_name = mesh_to_canonical_name.get(mesh, dname)
             return mesh, canonical_name, "", mesh.replace('MESH:', '')
             
-        # 3. Tertiary: Normalized Phenotype String
-        return f"NAME:{dname_lower}", dname, "", ""
+        # Filter out unmapped strings strictly for Option B
+        return None, None, None, None
 
-    resolved_records = df_clean.apply(resolve_disease, axis=1)
+    resolved_records = df_clean.apply(resolve_disease_strict, axis=1)
     df_clean['Disease_ID'] = [r[0] for r in resolved_records]
     df_clean['Canonical_Disease_Name'] = [r[1] for r in resolved_records]
     df_clean['Resolved_DO_ID'] = [r[2] for r in resolved_records]
     df_clean['Resolved_MeSH_ID'] = [r[3] for r in resolved_records]
     
-    # ----------------─────────────────────────────────────────────────────
+    # Strictly remove unmapped string rows
+    df_clean = df_clean.dropna(subset=['Disease_ID']).copy()
+    print(f"Association rows after 100% strict ontology disease resolution: {len(df_clean)}")
+    
+    # --------------------------------─────────────────────────────────────
     # BIOTYPE STANDARDIZATION
     # ----------------─────────────────────────────────────────────────────
     def standardize_biotype(btype):
-        b = str(btype).strip()
-        b_lower = b.lower()
-        if 'mirna' in b_lower:
+        b = str(btype).strip().lower()
+        if 'mirna' in b:
             return 'miRNA'
-        if 'lncrna' in b_lower:
+        if 'lncrna' in b:
             return 'lncRNA'
-        if 'circrna' in b_lower:
+        if 'circrna' in b:
             return 'circRNA'
-        if 'pirna' in b_lower:
+        if 'pirna' in b:
             return 'piRNA'
-        if 'snorna' in b_lower:
+        if 'snorna' in b:
             return 'snoRNA'
         return 'other_ncRNA'
         
     df_clean['Standardized_RNA_Type'] = df_clean['RNA Type'].apply(standardize_biotype)
     
     # ----------------─────────────────────────────────────────────────────
-    # OUTPUT MASTER CSV TABLES (asmsg_clean/)
+    # OUTPUT SINGLE PERFECTED MASTER CSV TABLES (asmsg_clean/)
     # ----------------─────────────────────────────────────────────────────
     
     # 1. Build Nodes CSV (ncRNA Master Table)
-    print("\nBuilding asmsg_nodes.csv...")
+    print("\nBuilding asmsg_nodes.csv with Head-Tail Dual Window Clamping...")
     node_data = df_clean.drop_duplicates(subset=['RNA Symbol'])[['RNA Symbol', 'Standardized_RNA_Type']].copy()
     node_data.rename(columns={'Standardized_RNA_Type': 'RNA Type'}, inplace=True)
-    node_data['Sequence'] = node_data['RNA Symbol'].map(matched_seqs)
-    node_data['Seq_Length'] = node_data['Sequence'].str.len()
+    
+    # Apply Head-Tail dual-window sequence clamping
+    raw_seqs = [matched_seqs[sym] for sym in node_data['RNA Symbol']]
+    clamped_seqs = [compute_head_tail_clamping(seq, max_len=1022) for seq in raw_seqs]
+    
+    node_data['Sequence'] = clamped_seqs
+    node_data['Raw_Seq_Length'] = [len(s) for s in raw_seqs]
+    node_data['Clamped_Seq_Length'] = [len(s) for s in clamped_seqs]
+    node_data['Is_Clamped'] = node_data['Raw_Seq_Length'] > 1022
+    
     node_file = os.path.join(out_dir, 'asmsg_nodes.csv')
     node_data.to_csv(node_file, index=False)
     
-    # 2. Build Diseases CSV (Disease Master Table)
-    print("Building asmsg_diseases.csv...")
+    # 2. Build Diseases CSV (Disease Master Table — 100% DOID/MeSH Curated)
+    print("Building asmsg_diseases.csv (100% DOID/MeSH Curated)...")
     disease_group = df_clean.groupby('Disease_ID').agg(
         Disease_Name=('Canonical_Disease_Name', 'first'),
         DO_ID=('Resolved_DO_ID', 'first'),
@@ -168,7 +244,7 @@ def build_clean_dataset():
     disease_group.to_csv(disease_file, index=False)
     
     # 3. Build Edges CSV with Dual Continuous Evidence Weighting
-    print("Building asmsg_edges.csv with dual PMID & confidence score weighting...")
+    print("Building asmsg_edges.csv with composite dual weighting...")
     
     def process_pmids(series):
         pmids = set()
@@ -219,35 +295,18 @@ def build_clean_dataset():
     edge_file = os.path.join(out_dir, 'asmsg_edges.csv')
     edge_df.to_csv(edge_file, index=False)
     
-    # ----------------─────────────────────────────────────────────────────
-    # BUILD HIGH-CONFIDENCE CORE GRAPH VARIANT (asmsg_clean_core/)
-    # ----------------─────────────────────────────────────────────────────
-    print("\nBuilding high-confidence core dataset variant (asmsg_clean_core/)...")
-    
-    # Core filter: Exclude unmapped NAME: disease nodes
-    core_disease_ids = set(disease_group[~disease_group['Disease_ID'].str.startswith('NAME:')]['Disease_ID'])
-    core_edges_df = edge_df[edge_df['Disease_ID'].isin(core_disease_ids)].copy()
-    
-    core_rna_symbols = set(core_edges_df['RNA Symbol'].unique())
-    core_nodes_df = node_data[node_data['RNA Symbol'].isin(core_rna_symbols)].copy()
-    core_diseases_df = disease_group[disease_group['Disease_ID'].isin(core_disease_ids)].copy()
-    
-    core_nodes_df.to_csv(os.path.join(core_dir, 'asmsg_nodes.csv'), index=False)
-    core_diseases_df.to_csv(os.path.join(core_dir, 'asmsg_diseases.csv'), index=False)
-    core_edges_df.to_csv(os.path.join(core_dir, 'asmsg_edges.csv'), index=False)
+    # 4. Compute ncRNA Topological Sequence Similarity Edges
+    sim_edges_df = compute_3mer_similarity_edges(node_data, threshold=0.85, top_k=5)
+    sim_edges_file = os.path.join(out_dir, 'ncrna_sequence_similarity_edges.csv')
+    sim_edges_df.to_csv(sim_edges_file, index=False)
     
     print("\n" + "="*50)
-    print("ASMSG REVISED DATASET RE-CONSTRUCTION COMPLETE!")
-    print(f"FULL GRAPH (asmsg_clean/):")
-    print(f" - ncRNA Nodes: {len(node_data)}")
-    print(f" - Disease Nodes: {len(disease_group)} (DOID: {len(disease_group[disease_group['Disease_ID'].str.startswith('DOID:')])}, MeSH: {len(disease_group[disease_group['Disease_ID'].str.startswith('MESH:')])}, NAME: {len(disease_group[disease_group['Disease_ID'].str.startswith('NAME:')])})")
-    print(f" - Edges: {len(edge_df)}")
-    print(f" - Edge Weights Mean: {edge_df['Edge_Weight'].mean():.4f}, Std: {edge_df['Edge_Weight'].std():.4f}, Min: {edge_df['Edge_Weight'].min():.4f}, Max: {edge_df['Edge_Weight'].max():.4f}")
-    
-    print(f"\nCORE GRAPH (asmsg_clean_core/):")
-    print(f" - ncRNA Nodes: {len(core_nodes_df)}")
-    print(f" - Standardized Disease Nodes: {len(core_diseases_df)}")
-    print(f" - High-Confidence Edges: {len(core_edges_df)}")
+    print("ASMSG SINGLE MASTER DATASET (asmsg_clean/) OPTION B COMPLETE!")
+    print(f"ncRNA Nodes: {len(node_data)} (Clamped at 1022 nt via Head-Tail Dual Window: {node_data['Is_Clamped'].sum()})")
+    print(f"Standardized Disease Nodes: {len(disease_group)} (DOID: {len(disease_group[disease_group['Disease_ID'].str.startswith('DOID:')])}, MeSH: {len(disease_group[disease_group['Disease_ID'].str.startswith('MESH:')])}, Raw Strings: 0)")
+    print(f"ncRNA-Disease Associations: {len(edge_df)}")
+    print(f"ncRNA-ncRNA Sequence Similarity Edges: {len(sim_edges_df)}")
+    print(f"Edge Weight Mean: {edge_df['Edge_Weight'].mean():.4f}, Std: {edge_df['Edge_Weight'].std():.4f}, Min: {edge_df['Edge_Weight'].min():.4f}, Max: {edge_df['Edge_Weight'].max():.4f}")
     print("="*50)
 
 if __name__ == "__main__":

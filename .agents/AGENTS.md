@@ -16,12 +16,11 @@ This file is maintained by agents to store critical state, paths, decisions, and
 
 ### Phase 1: Data Engine & Topology Overhaul (⏳ IN PROGRESS — DATASET PERFECTION FOCUS)
 - **Source Dataset**: RNADisease v4.0 (Gold Standard) + RNAcentral + miRBase v22 + GENCODE v44 + Ensembl 110 + circBase + piRBase.
-- **Node Resolution & Biotype Standardization (`match_ncrna_sequences.py`, `build_asmsg_dataset.py`)**: Multi-key sequence indexing resolved **20,973 verified human ncRNA nodes** across 6 standardized biotype classes (miRNA, lncRNA, circRNA, piRNA, snoRNA, other_ncRNA), retrieving true sequences (clamped to 1,022 nt).
-- **Synonym Disease Resolution Engine (`build_asmsg_dataset.py`)**: Dataset-wide cross-row DO ID & MeSH synonym inheritance mapped 1,761 DO IDs and 1,862 MeSH IDs, resolving 1,304 standardized Disease Ontology nodes and reducing unmapped strings to 1,380.
-- **Dual-Weighted Continuous Edge Formulation**: Formulated composite continuous edge weights \( w_{ij} = 0.5 \cdot w_{\text{PMID}} + 0.5 \cdot S_{\text{score}} \) (\( w_{ij} \in [0.2269, 0.9924] \), mean 0.3758, std 0.1599) across **129,200 unique edges**, eliminating flatline minimums.
-- **Dual Dataset Variant Export**: Exported Full Graph (`datasets/asmsg_clean/`) and High-Confidence Core Graph (`datasets/asmsg_clean_core/` with 20,559 ncRNAs, 1,304 DO/MeSH disease nodes, 121,768 edges).
-- **Construct Validity Specification (`CURATION_POLICY.md`)**: Formal policy documenting species restriction (*Homo sapiens* only), biotype consolidation, deduplication rules, and the operational definition of "sequence-matched".
-- **Current Objective**: Subject Phase 1 dataset to unsparing peer-review critique, resolve all string resolution, degree skew, and biotype coverage gaps BEFORE moving to Phase 2.
+- **Strict Disease Ontology Resolution (Option B)**: Mapped 1,761 DO IDs and 1,862 MeSH IDs, strictly filtering out unmapped strings to achieve **1,304 100% ontology-curated Disease Ontology nodes** (965 DO IDs, 339 MeSH IDs, 0 unmapped strings).
+- **Sequence Resolution & Head-Tail Clamping**: Resolved **20,559 verified human ncRNA sequence nodes** across 6 biotype classes (lncRNA, circRNA, piRNA, miRNA, snoRNA, other_ncRNA) using Head-Tail dual-window clamping (first 511 nt + last 511 nt for long transcripts).
+- **Dual-Weighted Continuous Associations**: Formulated composite continuous edge weights \( w_{ij} = 0.5 w_{\text{PMID}} + 0.5 S_{\text{score}} \) (\( w_{ij} \in [0.2269, 0.9924] \), mean 0.3773) across **121,768 high-confidence edges**.
+- **ncRNA Topological Sequence Similarity Edges**: Generated **71,187 inter-ncRNA sequence similarity edges** (`ncrna_sequence_similarity_edges.csv`, 3-mer cosine similarity $\ge 0.85$) to connect degree-1 leaf nodes and enrich heterogeneous message passing.
+- **Single Master Dataset Export**: Exported single perfected master dataset to `datasets/asmsg_clean/` (`asmsg_nodes.csv`, `asmsg_diseases.csv`, `asmsg_edges.csv`, `ncrna_sequence_similarity_edges.csv`, `CURATION_POLICY.md`).
 
 ### Phase 2: Multimodal Embedding Extraction Suite (📋 PLANNED)
 - Extract RNA-FM sequence embeddings, BioBERT & SapBERT disease embeddings, ChemBERTa-2 drug SMILES embeddings, and ablation feature vectors.
