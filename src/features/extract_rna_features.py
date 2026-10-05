@@ -5,8 +5,8 @@ import pandas as pd
 import torch
 import fm
 
-FASTA_FILE = 'd:/fydp/datasets/miRBase/mature.fa'
-HMDD_FILE = 'd:/fydp/datasets/hmdd/alldata_v4.xlsx'
+FASTA_FILE = 'd:/fydp/datasets/mirbase_sequences/mature.fa'
+HMDD_FILE = 'd:/fydp/datasets/hmdd_legacy/alldata_v4.xlsx'
 NCRNADRUG_FILE = 'd:/fydp/datasets/ncrnadrug/DR_Curated.xlsx'
 OUTPUT_DIR = 'd:/fydp/features'
 
