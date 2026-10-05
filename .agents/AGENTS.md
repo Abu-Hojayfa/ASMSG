@@ -14,30 +14,29 @@ This file is maintained by agents to store critical state, paths, decisions, and
 
 ## 2. Current Project State & Milestones
 
-### Phase 1: Data Engine & Topology Overhaul (✅ COMPLETED & REVISED)
+### Phase 1: Data Engine & Topology Overhaul (✅ COMPLETED)
 - **Source Dataset**: RNADisease v4.0 (Gold Standard) + RNAcentral + miRBase v22 + GENCODE v44 + Ensembl 110 + circBase + piRBase.
 - **Node Resolution Engine (`match_ncrna_sequences.py`)**: Multi-key sequence indexing resolved **20,973 verified human ncRNA nodes** across biotypes (74.1% miRNA, 14.6% lncRNA, 6.5% circRNA, 3.4% piRNA, 0.6% snoRNA, 0.03% tRNA), retrieving true sequences (clamped to 1,022 nt).
 - **Disease Ontology & Inheritance Engine (`build_asmsg_dataset.py`)**: Dataset-wide cross-row DO ID & MeSH inheritance increased DO ID row coverage to **211,120 association rows (89.95%)** and resolved raw disease strings into **2,749 Disease Ontology nodes** (965 DO IDs, 345 MeSH IDs, 1,439 clean string phenotypes).
-- **Continuous Edge Weighting**: Log-scaled **PMID evidence weights** \( w_{ij} \in (0, 1] \) across **132,021 unique edges** (max evidence = 257 PMIDs/edge; 71.3% single PMID).
-- **Output Artifacts**: Exported master clean dataset to `datasets/asmsg_clean/` (`asmsg_nodes.csv`, `asmsg_diseases.csv`, `asmsg_edges.csv`).
-- **Triage Additions Pending**: `CURATION_POLICY.md` (Task 1.4), adding RNADisease `score` column (Task 1.5), transparent per-biotype reporting (Task 1.6).
+- **Continuous Edge Weighting & Score Integration**: Log-scaled **PMID evidence weights** \( w_{ij} \in (0, 1] \) and RNADisease **confidence scores** \( S_{ij} \in [0.3290, 1.0000] \) across **132,021 unique edges**.
+- **Construct Validity Specification (`CURATION_POLICY.md`)**: Created formal policy documenting species/biotype scope, deduplication rules, and the operational definition of "sequence-matched".
+- **Output Artifacts**: Master clean dataset exported to `datasets/asmsg_clean/` (`asmsg_nodes.csv`, `asmsg_diseases.csv`, `asmsg_edges.csv`, `CURATION_POLICY.md`).
 
-### Phase 2: Multimodal Embedding & Ablation Engine (⏳ NEXT UP)
-- **ncRNA Embeddings**: Execute `src/features/run_rna_fm.py` to extract **640-dim RNA-FM embeddings** for 20,973 ncRNAs (`batch_size=16`, FP16).
-- **Disease Embeddings**: Construct `src/features/extract_disease_biobert.py` for **768-dim BioBERT embeddings** and **768-dim SapBERT embeddings** (Task 2.2b ablation).
-- **Drug Embeddings**: Construct `src/features/extract_drug_chemberta.py` for **384-dim ChemBERTa-2 embeddings**.
-- **Ablation Feature Engine (Task 2.4)**: Extract 3-mer frequency vectors, one-hot biotype vectors, sequence length scalars, and random init baselines.
+### Phase 2: Multimodal Embedding Extraction & Ablation Suite (⏳ IN PROGRESS)
+- **Feature Extraction Scripts Created**: `src/features/run_rna_fm.py` (Kaggle GPU execution ready), `src/features/extract_disease_biobert.py` (Task 2.2), `src/features/extract_disease_sapbert.py` (Task 2.2b), `src/features/extract_drug_chemberta.py` (Task 2.3).
+- **Ablation Feature Engine (`build_ablation_features.py`) (✅ COMPLETED)**: Generated 64-dim 3-mer frequency vectors (`ablation_3mer_features.pt`), one-hot biotype vectors (`ablation_biotype_features.pt`), sequence length scalars (`ablation_length_features.pt`), and 640-dim random Gaussian init baselines (`ablation_random_features.pt`).
 
-### Phase 3: PyG Heterogeneous Graph Builder (📋 PLANNED)
-- Construct PyTorch Geometric `HeteroData` object with multi-entity typed nodes (`ncRNA`, `Disease`, `Drug`), edge indices, PMID evidence weights, and RNADisease confidence scores.
+### Phase 3: PyG Heterogeneous Graph Builder (`build_hetero_graph.py`) (✅ COMPLETED)
+- Assembled PyTorch Geometric `HeteroData` graph object (`asmsg_hetero_graph.pt`) containing multi-entity typed nodes (`ncRNA`, `Disease`, `Drug`), bidirectional edge indices (132,021 edges), PMID evidence weights, and confidence scores.
 
 ### Phase 4: Adaptive Dual-View GNN & Contrastive Learning (📋 PLANNED)
 - Implement `src/models/asmsg_gnn.py` with learned confidence-aware edge-denoising gating MLP, dual-view GNN message passing, InfoNCE contrastive loss, and margin triplet loss.
 
-### Phase 5: Leakage-Controlled Evaluation & Rigorous Benchmark Suite (📋 PLANNED)
-- **Leakage Controls (Task 5.1/5.1b)**: Seed-family/CD-HIT 80% sequence identity ncRNA clustering & DO/MeSH subtree hierarchy-aware disease splits.
-- **4 Evaluation Quadrants (Task 5.2)**: Transductive S-S (Seen-Seen), Inductive U-S (Unseen ncRNA), Inductive S-U (Unseen Disease), Inductive U-U (Unseen-Unseen).
-- **Ranking & Classification Metrics (Task 5.2b)**: Hits@10, Hits@50, MRR, AUROC, AUPR.
+### Phase 5: Leakage-Controlled Evaluation & Benchmark Suite (⏳ IN PROGRESS)
+- **Identity & Hierarchy Cold-Start Splitter (`cold_start_split.py`) (✅ COMPLETED)**: Built 5-seed sequence-identity and DO/MeSH subtree hierarchy-aware splits across all 4 evaluation quadrants: S-S (75.1%), U-S (15.5%), S-U (7.9%), U-U (1.6%).
+- **Trivial Baseline Evaluator (`trivial_baselines.py`) (✅ COMPLETED)**: Demonstrated that Degree-Product achieves 0.9892 AUROC in transductive S-S but collapses to 0.1751 in inductive U-S, empirically confirming hub bias.
+- **Temporal Validation Engine (`temporal_split.py`) (✅ COMPLETED)**: Partitioned graph into 91,594 historical training edges (< 2020) and 40,427 prospective test edges (>= 2020).
+- **Remaining Phase 5 Tasks**: Model architecture reimplementations (SSCLMD, SSLGRDA, GSLRDA, MIFNDRA, DMGAT) under identical ASMSG splits.
 - **5 Trivial Baselines (Task 5.3)**: Degree-only, Biotype-only, Sequence-length-only, k-NN-on-3-mer, Random.
 - **Reimplemented Baselines (Task 5.4)**: Reimplement SSCLMD, SSLGRDA, GSLRDA, MIFNDRA, DMGAT architectures on identical ASMSG splits.
 - **Statistical Protocol (Task 5.5)**: 5 random seeds, mean ± std, paired t-test / Wilcoxon signed-rank test.
