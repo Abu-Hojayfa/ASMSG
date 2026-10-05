@@ -146,6 +146,17 @@ def build_clean_dataset():
                         pmids.add(p_clean)
         return list(pmids)
 
+    def process_scores(series):
+        valid_scores = []
+        for val in series.dropna():
+            try:
+                s_float = float(val)
+                if not np.isnan(s_float):
+                    valid_scores.append(s_float)
+            except (ValueError, TypeError):
+                pass
+        return round(float(max(valid_scores)), 4) if valid_scores else 0.5000
+
     edge_summary = []
     grouped_edges = df_clean.groupby(['RNA Symbol', 'Disease_ID'])
     
@@ -153,12 +164,14 @@ def build_clean_dataset():
         pmids = process_pmids(group['PMID'])
         ev_count = max(len(pmids), len(group))
         pmid_str = ";".join(pmids) if pmids else "UNSPECIFIED"
+        conf_score = process_scores(group['score'])
         
         edge_summary.append({
             'RNA Symbol': rna_sym,
             'Disease_ID': dis_id,
             'Evidence_Count': ev_count,
-            'PMID_List': pmid_str
+            'PMID_List': pmid_str,
+            'Confidence_Score': conf_score
         })
         
     edge_df = pd.DataFrame(edge_summary)
