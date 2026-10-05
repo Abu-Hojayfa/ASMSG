@@ -1,0 +1,125 @@
+import os
+import json
+import numpy as np
+import pandas as pd
+
+def build_clean_dataset():
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    excel_path = os.path.join(base_dir, 'datasets', 'rnadisease_v4', 'alldata.xlsx')
+    fasta_path = os.path.join(base_dir, 'datasets', 'rnadisease_v4', 'matched_sequences.fa')
+    out_dir = os.path.join(base_dir, 'datasets', 'asmsg_clean')
+    
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+        
+    print("Loading matched sequences...")
+    matched_seqs = {}
+    current_name = None
+    with open(fasta_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith(">"):
+                current_name = line[1:]
+            elif current_name:
+                matched_seqs[current_name] = line
+                current_name = None
+                
+    valid_names = set(matched_seqs.keys())
+    print(f"Total verified RNA nodes with sequences: {len(valid_names)}")
+    
+    print("Loading RNADisease database (alldata.xlsx)...")
+    df = pd.read_excel(excel_path)
+    
+    # Filter for Human and ncRNA
+    df = df[df['specise'].astype(str).str.contains("Homo sapiens", na=False, case=False)]
+    df = df[~df['RNA Type'].astype(str).str.contains("mRNA", na=False, case=False)]
+    
+    print(f"Total human ncRNA rows: {len(df)}")
+    
+    # Keep ONLY rows where the RNA Symbol is in our valid, matched list
+    df_clean = df[df['RNA Symbol'].isin(valid_names)].copy()
+    print(f"Human ncRNA rows after sequence verification: {len(df_clean)}")
+    
+    # 1. Standardize Disease Identifiers
+    def get_disease_id(row):
+        doid = str(row['DO ID']).strip() if pd.notnull(row['DO ID']) else ""
+        if doid and doid.lower() != 'nan' and doid.lower() != 'none':
+            if doid.startswith('DOID:'):
+                return doid
+            return f"DOID:{doid}"
+        mesh = str(row['MeSH ID']).strip() if pd.notnull(row['MeSH ID']) else ""
+        if mesh and mesh.lower() != 'nan' and mesh.lower() != 'none':
+            return f"MESH:{mesh}"
+        dname = str(row['Disease Name']).strip().lower()
+        return f"NAME:{dname}"
+
+    df_clean['Disease_ID'] = df_clean.apply(get_disease_id, axis=1)
+    
+    # 2. Build Nodes CSV (ncRNA Master Table)
+    print("Building asmsg_nodes.csv...")
+    node_data = df_clean.drop_duplicates(subset=['RNA Symbol'])[['RNA Symbol', 'RNA Type']].copy()
+    node_data['Sequence'] = node_data['RNA Symbol'].map(matched_seqs)
+    node_data['Seq_Length'] = node_data['Sequence'].str.len()
+    node_file = os.path.join(out_dir, 'asmsg_nodes.csv')
+    node_data.to_csv(node_file, index=False)
+    
+    # 3. Build Diseases CSV (Disease Master Table)
+    print("Building asmsg_diseases.csv...")
+    disease_group = df_clean.groupby('Disease_ID').agg(
+        Disease_Name=('Disease Name', 'first'),
+        DO_ID=('DO ID', 'first'),
+        MeSH_ID=('MeSH ID', 'first'),
+        Total_Edges=('RNA Symbol', 'count')
+    ).reset_index()
+    disease_file = os.path.join(out_dir, 'asmsg_diseases.csv')
+    disease_group.to_csv(disease_file, index=False)
+    
+    # 4. Build Edges CSV with PMID Evidence Weighting
+    print("Building asmsg_edges.csv with continuous PMID evidence weighting...")
+    
+    def process_pmids(series):
+        pmids = set()
+        for val in series.dropna():
+            s_val = str(val).strip()
+            if s_val and s_val != 'nan':
+                for p in s_val.replace(';', ',').split(','):
+                    p_clean = p.strip().split('.')[0]
+                    if p_clean.isdigit():
+                        pmids.add(p_clean)
+        return list(pmids)
+
+    edge_summary = []
+    grouped_edges = df_clean.groupby(['RNA Symbol', 'Disease_ID'])
+    
+    for (rna_sym, dis_id), group in grouped_edges:
+        pmids = process_pmids(group['PMID'])
+        ev_count = max(len(pmids), len(group))
+        pmid_str = ";".join(pmids) if pmids else "UNSPECIFIED"
+        
+        edge_summary.append({
+            'RNA Symbol': rna_sym,
+            'Disease_ID': dis_id,
+            'Evidence_Count': ev_count,
+            'PMID_List': pmid_str
+        })
+        
+    edge_df = pd.DataFrame(edge_summary)
+    
+    # Compute continuous log-scaled edge weights: w_ij = log(1 + E_ij) / max(log(1 + E_ij))
+    max_log_ev = np.log1p(edge_df['Evidence_Count'].max())
+    edge_df['Edge_Weight'] = (np.log1p(edge_df['Evidence_Count']) / max_log_ev).round(4)
+    
+    edge_file = os.path.join(out_dir, 'asmsg_edges.csv')
+    edge_df.to_csv(edge_file, index=False)
+    
+    print("\n" + "="*50)
+    print("ASMSG High-Fidelity Dataset Construction Complete!")
+    print(f"Unique ncRNA Nodes: {len(node_data)}")
+    print(f"Unique Disease Nodes: {len(disease_group)}")
+    print(f"Unique ncRNA-Disease Edges: {len(edge_df)}")
+    print(f"Max Evidence Count for single edge: {edge_df['Evidence_Count'].max()}")
+    print(f"Saved to: {out_dir}")
+    print("="*50)
+
+if __name__ == "__main__":
+    build_clean_dataset()

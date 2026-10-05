@@ -1,57 +1,36 @@
-# ASMSG Datasets
+# ASMSG Datasets (v2)
+
+This project uses a unified dataset pipeline based on RNADisease v4.0, moving away from legacy miRNA-only databases to support true multimodal multi-biotype ncRNA-disease predictions.
 
 ## Folder Structure
 
 ```
 datasets/
-├── hmdd/              # HMDD v4.0 — miRNA-disease associations
-│   └── alldata_v4.xlsx    # Full miRNA-disease association data (2023.07)
+├── asmsg_clean/           # Master Overhauled Dataset (Clean CSVs)
+│   ├── asmsg_nodes.csv    # 20,973 verified ncRNA nodes with sequence strings
+│   ├── asmsg_diseases.csv # 2,749 Disease Ontology (DO ID) standardized nodes
+│   └── asmsg_edges.csv    # 132,021 unique edges with continuous PMID evidence weights
 │
-├── ncrnadrug/         # ncRNADrug — ncRNA-drug resistance & targeting
-│   ├── DR_Curated.xlsx    # Drug Resistance - Curated (low-throughput)
-│   ├── DR_GEO.xlsx        # Drug Resistance - GEO (high-throughput)
-│   ├── DR_NCI60.xlsx      # Drug Resistance - NCI-60 (high-throughput)
-│   ├── DR_CCLE.xlsx       # Drug Resistance - CCLE (high-throughput)
-│   ├── DT_Curated.xlsx    # Drug Target - Curated (low-throughput)
-│   ├── DT_GEO.xlsx        # Drug Target - GEO (high-throughput)
-│   └── DT_CMap.xlsx       # Drug Target - CMap (high-throughput)
+├── rnadisease_v4/         # Primary Edge Source (RNADisease v4.0)
+│   └── alldata.xlsx       # Replaces HMDD and LncRNADisease (343k entries)
 │
-├── miRBase/           # miRBase — miRNA sequences
-│   ├── mature.fa          # All mature miRNA sequences (FASTA)
-│   └── hsa.gff3           # Human miRNA genome coordinates
+├── ncrna_sequences/       # RNA-FM Sequence Input
+│   ├── gencode_lncrna.fa.gz     # GENCODE Human lncRNAs
+│   ├── ensembl_ncrna.fa.gz      # Ensembl Human ncRNAs
+│   ├── circbase_circrna.fa.gz   # circBase Human circRNAs
+│   └── pirbase_pirna.fa.gz      # piRBase Human piRNAs
 │
-├── lncrnadisease/     # LncRNADisease v2.0 — lncRNA-disease (MANUAL)
-│   └── (download manually - server unreliable)
+├── ncrnadrug/             # Drug Target Edges
+│   └── DR_Curated.xlsx    # ncRNA-drug curated resistance
 │
-├── drugbank/          # DrugBank — Drug structures (MANUAL)
-│   └── (requires academic license - see below)
+├── drugbank/              # Drug ChemBERTa Input
+│   └── drug_smiles.csv    # PubChem CID and SMILES strings
 │
-└── baseline/          # Your existing SSLGRDA baseline data
-    ├── rda.csv            # ncRNA-disease association matrix
-    ├── sr.csv             # ncRNA similarity matrix
-    └── sd.csv             # Disease similarity matrix
+└── mirbase_sequences/     # miRBase sequences for miRNAs
 ```
 
-## Sources
+## Master Output Datasets (`asmsg_clean/`)
 
-| Dataset | URL | Status |
-|---------|-----|--------|
-| HMDD v4.0 | https://www.cuilab.cn/hmdd | ✅ Downloaded |
-| ncRNADrug | http://www.jianglab.cn/ncRNADrug/ | ✅ Downloaded |
-| miRBase | https://mirbase.org/download/ | ✅ Downloaded |
-| LncRNADisease v2.0 | https://www.rnanut.net/lncrnadisease/ | ⚠️ Server down - download manually |
-| DrugBank | https://go.drugbank.com/ | ⚠️ Needs academic license signup |
-
-## Manual Downloads Needed
-
-### DrugBank (Required for drug SMILES)
-1. Go to https://go.drugbank.com/releases/latest
-2. Register for a free academic license
-3. Download "All Drug Structures" (SDF or SMILES format)
-4. Place in `datasets/drugbank/`
-
-### LncRNADisease v2.0 (Required for lncRNA-disease associations)
-1. Try: https://www.rnanut.net/lncrnadisease/ (server is sometimes down)
-2. Alternative: https://www.cuilab.cn/lncrnadisease
-3. Download the full association data
-4. Place in `datasets/lncrnadisease/`
+1. **`asmsg_nodes.csv`**: Contains **20,973 verified ncRNA sequence nodes** across miRNAs, lncRNAs, circRNAs, piRNAs, snoRNAs, and tRNAs.
+2. **`asmsg_diseases.csv`**: Contains **2,749 standardized Disease Ontology (DO ID) nodes**.
+3. **`asmsg_edges.csv`**: Contains **132,021 unique edges** with continuous PMID evidence weights \( w_{ij} \in (0, 1] \) derived from 234,698 literature records.

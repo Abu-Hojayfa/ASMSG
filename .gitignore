@@ -1,6 +1,5 @@
 # Specific User Ignored Files
 262_041.pdf
-ASMSG_Action_Plan.md
 test.py
 
 # Python
@@ -13,5 +12,16 @@ __pycache__/
 .idea/
 .DS_Store
 
-# Datasets and Large Feature Matrices (Do not push gigabytes of data to GitHub)
-ASMSG_Complete_Methodology.md
+# Datasets and Large Feature Matrices
+# (Keep all raw data, sequence databases, and extracted embeddings entirely private)
+datasets/
+features/
+*.npy
+*.pt
+*.pth
+*.fa
+*.fasta
+*.gz
+*.csv
+*.xlsx
+

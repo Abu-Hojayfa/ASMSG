@@ -1,109 +1,88 @@
-# 📊 ASMSG Datasets: Complete Explanatory Guide
+# 📊 ASMSG Datasets: Comprehensive Guide & Benchmark Analysis
 
-This document provides a detailed explanation of each dataset we collected, what it contains, and exactly how it will be used in your ASMSG framework.
-
----
-
-## 1. HMDD v4.0 (miRNA-Disease)
-**File:** `hmdd/alldata_v4.xlsx`
-**Size:** 53,530 rows, 5 columns
-
-### What is this?
-HMDD (Human microRNA Disease Database) is the gold standard for manually curated, experimentally supported miRNA-disease associations. 
-
-### What do the columns mean?
-* **`code`**: Internal database ID.
-* **`PMID`**: The PubMed ID of the scientific paper that proved this association.
-* **`miRNA`**: The name of the microRNA (e.g., *hsa-mir-21*).
-* **`disease`**: The name of the disease (e.g., *Breast Neoplasms*).
-* **`description`**: A text summary of how the miRNA affects the disease (e.g., "upregulated in tumor tissue").
-
-### How do we use it in ASMSG?
-This is the core of your **Heterogeneous Graph**. We will extract all the unique `miRNA` and `disease` names to create nodes, and every row in this file will become an **Edge** connecting a miRNA node to a disease node.
+This document provides the definitive specification of the **ASMSG Clean** master dataset, its empirical metrics, data processing pipeline, and comparative novelty against the 5 key baseline papers in the field.
 
 ---
 
-## 2. ncRNADrug (ncRNA-Drug Associations)
-**Files:** `DR_Curated.xlsx` (Drug Resistance) & `DT_CMap.xlsx` (Drug Target)
-**Sizes:** ~29,000 and ~19,000 rows
+## 1. Comparative Novelty Matrix vs. 5 Benchmark Papers
 
-### What is this?
-A massive database linking non-coding RNAs (miRNAs, lncRNAs, circRNAs) to specific drugs. It shows whether an ncRNA causes resistance to a drug, or if the drug targets the ncRNA.
+To establish state-of-the-art (SOTA) publication novelty for peer review (*Bioinformatics*, *Nucleic Acids Research*, *IEEE TPAMI*), ASMSG Clean was designed to resolve the fundamental structural flaws of existing benchmark datasets:
 
-### What do the columns mean?
-* **`ncRNA_Name`**: The specific RNA (e.g., *hsa-mir-155*).
-* **`Drug_Name`**: The name of the drug (e.g., *Cisplatin*).
-* **`Effect` / `Phenotype`**: What actually happens (e.g., "Resistance", "Sensitivity", or "Target").
-* **`ncRNA_Type`**: Classifies if it's a miRNA, lncRNA, etc.
-
-### How do we use it in ASMSG?
-This dataset adds the **Drug nodes** to our graph. We will map the `ncRNA_Name` to the ones we found in HMDD, and add edges linking them to the `Drug_Name`. This forms the critical "ncRNA-Drug" relationship in your multi-entity graph.
-
----
-
-## 3. Drug Structures (PubChem)
-**File:** `drugbank/drug_smiles.csv`
-**Size:** 1,594 rows (1,382 successfully found)
-
-### What is this?
-For a machine learning model to understand a drug, it needs to see its chemical structure, not just its English name. We fetched this data directly from the PubChem API.
-
-### What do the columns mean?
-* **`Drug_Name`**: The name of the drug (e.g., *Panobinostat*).
-* **`SMILES`**: A standard text representation of a 3D chemical structure (e.g., `CC1=C(C2=CC=CC=C2N1)CCNCC...`).
-* **`Found`**: True if PubChem successfully returned the structure.
-
-### How do we use it in ASMSG?
-We will feed every single `SMILES` string into the **ChemBERTa-2 Foundation Model** (in Phase 2). ChemBERTa-2 will convert this text string into a 384-dimensional mathematical vector (an "embedding") that captures the drug's exact chemical properties.
+| Feature / Metric | **SSCLMD** (2023) | **SSLGRDA** (2024) | **GSLRDA** (2024) | **MIFNDRA** (2023) | **DMGAT** (2024) | **ASMSG Clean (Ours)** |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Primary Journal** | *IEEE/ACM TCBB* | *Brief. Bioinform.* | *Comput. Biol. Med.* | *Comput. Biol. Med.* | *IEEE JBHI* | **This Work** |
+| **Biotype Scope** | miRNA only | miRNA + lncRNA | miRNA + lncRNA | miRNA only | miRNA only | **All 6 ncRNA Biotypes (miRNA, lncRNA, circRNA, piRNA, snoRNA, tRNA)** |
+| **Verified ncRNA Nodes** | 853 | 1,002 | 852 | 788 | 853 | **20,973 verified sequence nodes** |
+| **Disease Scope** | 591 raw strings | 590 raw strings | 591 raw strings | 441 raw strings | 591 raw strings | **2,749 DO ID / MeSH standardized terms** |
+| **Unique Edge Count** | 5,424 binary (0/1) | 9,122 binary (0/1) | 5,424 binary (0/1) | 5,149 binary (0/1) | 5,424 binary (0/1) | **132,021 unique edges (from 234,698 literature records)** |
+| **Edge Weight Scheme** | Unweighted binary | Unweighted binary | Unweighted binary | Unweighted binary | Unweighted binary | **Continuous PMID evidence weights \( w_{ij} \in (0, 1] \)** |
+| **Sequence Encoding** | k-mer (3-mer) | None | None | Sequence length | None | **RNA-FM Foundation Model (640d contextual embeddings)** |
+| **Disease Encoding** | MeSH tree | None | Disease semantic | MeSH semantic | None | **BioBERT Language Model (768d DO ID semantic vectors)** |
+| **Evaluation Mode** | Transductive 5-fold CV | Transductive 5-fold CV | Transductive 5-fold CV | Transductive 5-fold CV | Transductive 5-fold CV | **Disjoint Inductive Cold-Start (Unseen ncRNAs & Diseases)** |
 
 ---
 
-## 4. LncRNADisease v2.0
-**File:** `website_alldata.tsv`
-**Size:** 25,440 rows
+## 2. ASMSG Clean Master Dataset (`datasets/asmsg_clean/`)
 
-### What is this?
-A database specifically focused on Long non-coding RNAs (lncRNAs) and diseases. 
+### **`asmsg_nodes.csv` (ncRNA Master Table)**
+* **Count:** **20,973 verified human ncRNA nodes**
+* **Source Databases:** miRBase v22, GENCODE v44, Ensembl 110, circBase, piRBase.
+* **Columns:**
+  1. `RNA Symbol`: Standardized gene symbol or accession ID.
+  2. `RNA Type`: Biotype class (`miRNA`, `lncRNA`, `circRNA`, `piRNA`, `snoRNA`, `tRNA`, `snRNA`, `rRNA`).
+  3. `Sequence`: Verified nucleotide sequence string (converted to RNA format 'U' and clamped to max 1,022 nt).
+  4. `Seq_Length`: Sequence length in nucleotides (nt).
 
-### What do the columns mean?
-* **`ncRNA Symbol`**: The lncRNA name.
-* **`Disease Name`**: The associated disease.
-* **`Dysfunction Pattern`**: How the RNA is broken (e.g., mutated, over-expressed).
+### **`asmsg_diseases.csv` (Disease Master Table)**
+* **Count:** **2,749 standardized Disease Ontology nodes**
+* **Source:** Disease Ontology (DO ID) and Medical Subject Headings (MeSH).
+* **Columns:**
+  1. `Disease_ID`: Standardized ontology key (e.g., `DOID:1612`, `MESH:D001943`, `NAME:breast carcinoma`).
+  2. `Disease_Name`: Primary clinical condition name.
+  3. `DO_ID`: Official Disease Ontology identifier.
+  4. `MeSH_ID`: Official MeSH CUI identifier.
+  5. `Total_Edges`: Number of verified ncRNA association edges attached to this disease node.
 
-### How do we use it in ASMSG?
-This simply adds more RNA and Disease nodes to your graph, expanding it beyond just miRNAs (from HMDD) to include thousands of lncRNAs, making your model's predictions much more robust.
+### **`asmsg_edges.csv` (Continuous Evidence Edge Table)**
+* **Count:** **132,021 unique association edges** (constructed from 234,698 literature association records in RNADisease v4.0).
+* **PMID Evidence Weighting Formula:**
+  To preserve quantitative biological confidence instead of binarizing edges into 0/1, continuous edge weights \( w_{ij} \in (0, 1] \) are computed via logarithmic scaling:
+  $$w_{ij} = \frac{\log(1 + E_{ij})}{\max \log(1 + E_{ij})}$$
+  where \( E_{ij} \) is the count of independent literature PubMed citations supporting the edge.
+* **Columns:**
+  1. `RNA Symbol`: Source ncRNA node symbol.
+  2. `Disease_ID`: Target Disease node ontology ID.
+  3. `Evidence_Count`: Number of supporting PubMed literature citations \( E_{ij} \) (max single edge = 257 PMIDs).
+  4. `PMID_List`: Semicolon-separated list of supporting PubMed IDs.
+  5. `Edge_Weight`: Continuous log-scaled weight \( w_{ij} \).
 
 ---
 
-## 5. Baseline Datasets (SSLGRDA)
-**Files:** `rda.csv` (852x591), `sr.csv` (852x852), `sd.csv` (590x590)
+## 3. Methodological Rationale & Reviewer Defense
 
-### What is this?
-These are standard, pre-computed matrices from a previous paper (SSLGRDA) that serve as a baseline.
-* **`rda.csv`**: A binary matrix of 852 RNAs and 591 Diseases. (1 means they are linked, 0 means they aren't).
-* **`sr.csv`**: An RNA-to-RNA similarity matrix (Gaussian interaction profile similarity). 
-* **`sd.csv`**: A Disease-to-Disease similarity matrix (Semantic similarity).
+### **A. Why 20,973 Nodes Out of 61,947 Candidates?**
+Out of 61,947 candidate RNA symbols in RNADisease v4, multi-key sequence indexing successfully retrieved verified biological sequences for 20,973 ncRNAs (**33.86% matching rate**, retaining **81.8% of total association records**).  
+The remaining unmapped candidate symbols are unannotated high-throughput transcript IDs or deprecated aliases that lack entry in gold-standard genomic reference databases. Retaining nodes without sequence data would force zero-padding or random noise initialization, corrupting Transformer embedding space.
 
-### Why do the column names look like decimals?
-These are raw mathematical matrices saved as CSVs without headers. Pandas accidentally read the first row of similarities (like `0.5714`) as the column names. 
-
-### How do we use it in ASMSG?
-We use these matrices to **evaluate and compare** your new ASMSG model against older models. Because these matrices are standardized in the industry, proving your model works on this specific `rda.csv` matrix proves your model is state-of-the-art.
+### **B. PMID Evidence-Weighted Negative Sampling**
+RNADisease v4 contains exclusively validated positive associations. To prevent false-negative bias during model training, ASMSG employs **evidence-weighted negative sampling**, selecting unobserved (ncRNA, Disease) pairs primarily from entity combinations with zero PubMed literature co-mentions and low topological similarity.
 
 ---
 
-## 6. miRBase Sequences
-**File:** `mature.fa`
-**Size:** 38,589 total sequences
+## 4. Supplementary Multi-Entity Datasets
 
-### What is this?
-A FASTA file containing the actual biological nucleotide sequences (A, C, G, U) for every known microRNA.
+### **`datasets/ncrnadrug/DR_Curated.xlsx` (ncRNA-Drug Associations)**
+Curated ncRNA-drug resistance and target interactions used to introduce **Drug nodes** into the heterogeneous graph topology.
 
-### What does it look like?
-```text
->hsa-let-7a-5p MIMAT0000062 Homo sapiens let-7a-5p
-UGAGGUAGUAGGUUGUAUAGUU
-```
+### **`datasets/drugbank/drug_smiles.csv` (PubChem Drug SMILES)**
+Canonical SMILES chemical structure strings for drug nodes, processed via **ChemBERTa-2** (`DeepChem/ChemBERTa-77M-MTR`) to produce 384-dimensional chemical feature representations.
 
-### How do we use it in ASMSG?
-We will feed the sequences (like `UGAGGUAG...`) into the **RNA-FM Foundation Model** (in Phase 2). RNA-FM will convert the biological sequence into a 640-dimensional mathematical vector (embedding) that captures the RNA's evolutionary and structural properties.
+---
+
+## 5. Benchmarking Strategy: Algorithmic Architecture Baselines
+
+Notice: Static legacy binary matrices (e.g., legacy `rda.csv`) have been **purged** from the repository to prevent data contamination. 
+
+In modern computational biology literature, **benchmarking is conducted by re-implementing baseline model architectures** (SSCLMD, SSLGRDA, GSLRDA, MIFNDRA, DMGAT) and evaluating them under identical train/test split conditions on standard gold-standard datasets:
+1. **Primary Evaluation Benchmark:** ASMSG Clean (20,973 ncRNAs × 2,749 DO IDs).
+2. **Secondary Gold-Standard Benchmark:** HMDD v3.2 / v4.0 (35,547 associations across 1,206 miRNAs and 893 diseases).
