@@ -67,66 +67,48 @@ $$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{BCE}} + \lambda_1 \mathcal{L}_
 
 ---
 
-## 3. Phase-by-Phase Technical Execution Plan
+## 3. Phase 1 Rigor Overhaul & 8-Point Critique Resolution Plan
 
-### Phase 1: Data Engine Repair & Mapping Overhaul (✅ COMPLETED & REVISED)
-- [x] **Task 1.1:** Overhaul `match_ncrna_sequences.py` with multi-key sequence indexing. Retrieved **20,973 verified ncRNA sequence nodes**.
-- [x] **Task 1.2:** Implement DO ID standardization in `build_asmsg_dataset.py`. Standardized 3,321 raw strings into **2,749 Disease Ontology nodes**.
-- [x] **Task 1.3:** Calculate continuous PMID evidence edge weights \( w_{ij} \in (0, 1] \) across **132,021 unique edges**. Exported to `datasets/asmsg_clean/`.
-- [ ] **Task 1.4 (NEW):** Create `datasets/asmsg_clean/CURATION_POLICY.md` documenting evidence types, Homo sapiens restriction, dedup rules, conflict resolution, and precise definition of sequence matching.
-- [ ] **Task 1.5 (NEW):** Add `score` column from RNADisease v4 to `asmsg_edges.csv` as an independent confidence signal distinct from PMID count.
-- [ ] **Task 1.6 (NEW):** Report per-biotype statistics transparently, explicitly acknowledging miRNA dominance (74.1%).
+To resolve all 8 critique points with absolute scientific rigor, Phase 1 is extended to implement the following five dedicated execution modules:
 
-### Phase 2: Multimodal Embedding Extraction & Feature Ablation Suite (⏳ NEXT UP)
-- [ ] **Task 2.1:** Execute `src/features/run_rna_fm.py` using `d:\fydp\venv\Scripts\python.exe` to generate 640-dim embeddings for 20,973 ncRNAs using chunked FP16 batching (`batch_size=16`). Save to `datasets/asmsg_clean/rna_fm_embeddings.pt`.
-- [ ] **Task 2.2:** Build `src/features/extract_disease_biobert.py` using BioBERT (`dmis-lab/biobert-base-cased-v1.2`) to produce 768-dim disease embeddings for 2,749 DO IDs. Save to `datasets/asmsg_clean/disease_biobert_embeddings.pt`.
-- [ ] **Task 2.2b (NEW):** Extract **SapBERT** (`cambridgeltl/SapBERT-from-PubMedBERT-fulltext`) 768-dim disease embeddings for ablation comparison. Save to `datasets/asmsg_clean/disease_sapbert_embeddings.pt`.
-- [ ] **Task 2.3:** Build `src/features/extract_drug_chemberta.py` using ChemBERTa-2 (`DeepChem/ChemBERTa-77M-MTR`) to produce 384-dim drug embeddings. Save to `datasets/asmsg_clean/drug_chemberta_embeddings.pt`.
-- [ ] **Task 2.4 (NEW):** Build ablation feature sets:
-  - 3-mer frequency vectors for all ncRNAs.
-  - One-hot biotype encoding vectors.
-  - Sequence-length-only scalar features.
-  - Random init baseline embeddings (learn from scratch).
+### Module 1: Synonym Engine, Alias Resolution & Enriched Edge Metadata (Critiques 4 & 7)
+- [ ] **Task 1.1:** Build `src/data/alias_resolution.py` using HGNC Helper tables, NCBI Gene Synonyms, and RNAcentral Accessions to map legacy/deprecated symbols (`NCRNA...`, `NONHSAT...`, `MIMAT...`) prior to sequence matching.
+- [ ] **Task 1.2:** Update `build_asmsg_dataset.py` to retain `Publication_Year`, `Evidence_Type` (experimental vs predicted), `Stable_RNA_ID` (Ensembl/miRBase/HGNC), and `Dysregulation_Direction` (up/down) directly in `asmsg_edges.csv`.
 
-### Phase 3: PyG HeteroData Graph Builder
-- [ ] **Task 3.1:** Create `src/graph/build_hetero_graph.py` to construct `torch_geometric.data.HeteroData` containing all node features (RNA-FM, BioBERT, ChemBERTa-2, ablation sets), edge indices, continuous PMID weights, and confidence scores. Save to `datasets/asmsg_clean/asmsg_hetero_graph.pt`.
+### Module 2: Exact Disease Ontology Hierarchy & Funnel Verification (Critiques 5 & 6)
+- [ ] **Task 2.1:** Replace loose regex string stripping (`clean_name()`) with exact Disease Ontology `doid.obo` DAG parsing and MeSH tree mappings to preserve fine-grained parent-child term distinctions.
+- [ ] **Task 2.2:** Build `src/data/verify_dataset_funnel.py` to calculate all row drops, mapping rates, biotype breakdowns, and edge statistics dynamically from exported CSVs, eliminating manual textual discrepancies.
 
-### Phase 4: Core Model Architecture & Loss Functions
-- [ ] **Task 4.1:** Implement `src/models/asmsg_gnn.py` with dual-view encoder, adaptive gating MLP, and heterogeneous message passing (`HeteroConv` with `GATv2Conv`).
-- [ ] **Task 4.2:** Implement InfoNCE contrastive loss, margin triplet loss, and BCE link prediction head in `src/models/losses.py`.
+### Module 3: Leakage-Free Dynamic Topology Generator (Critique 1)
+- [ ] **Task 3.1:** Remove static sequence similarity edges from `datasets/asmsg_clean/`.
+- [ ] **Task 3.2:** Implement `src/graph/build_split_topology.py` to construct sequence similarity edges **dynamically strictly within training fold nodes ($\mathcal{V}_{\text{train}}$)** during PyG graph building. Enforce biotype-stratified & length-normalized TF-IDF cosine similarity.
 
-### Phase 5: Leakage-Controlled Inductive Benchmarking & Evaluation Suite
-- [ ] **Task 5.1 (REVISED):** Implement **identity-clustered splits** for ncRNA cold-start in `src/evaluation/cold_start_split.py`:
-  - Cluster miRNAs by seed-region family (miRBase family annotations).
-  - Cluster lncRNAs/circRNAs by sequence identity (CD-HIT at 80% threshold).
-  - Hold out entire sequence/family clusters, preventing sequence leakage.
-- [ ] **Task 5.1b (NEW):** Implement **hierarchy-aware splits** for disease cold-start:
-  - Hold out entire disease subtrees in the DO/MeSH hierarchy, ensuring no ancestor/descendant leaks into training graph.
-- [ ] **Task 5.2 (REVISED):** Implement all 4 evaluation settings:
-  1. **S-S (Seen-Seen):** Standard transductive link prediction.
-  2. **U-S (Unseen ncRNA, Seen Disease):** Inductive ncRNA cold-start.
-  3. **S-U (Seen ncRNA, Unseen Disease):** Inductive disease cold-start.
-  4. **U-U (Unseen-Unseen):** Dual cold-start (both entities unseen).
-- [ ] **Task 5.2b (NEW):** Report ranking metrics alongside classification metrics:
-  - Hits@10, Hits@50, MRR, AUROC, AUPR per disease and per ncRNA.
-- [ ] **Task 5.3 (NEW):** Implement 5 trivial baseline predictors:
-  1. Degree-product predictor (ncRNA degree × Disease degree).
-  2. RNA Type biotype-only predictor.
-  3. Sequence-length-only predictor.
-  4. k-NN on 3-mer frequency vectors.
-  5. Uniform random baseline.
-- [ ] **Task 5.4 (REVISED):** Reimplement SSCLMD, SSLGRDA, GSLRDA, MIFNDRA, DMGAT architectures:
-  - Train and evaluate all 5 baselines under identical ASMSG Clean splits.
-  - Document adaptations for cold-start evaluation.
-- [ ] **Task 5.5 (NEW):** Implement 5-seed protocol with confidence intervals:
-  - Run all experiments across 5 random seeds (report mean ± std).
-  - Paired t-test / Wilcoxon signed-rank test for statistical significance.
-- [ ] **Task 5.6 (NEW):** Implement temporal validation split:
-  - Train on edges with PMIDs published before year T; test on edges published in year T or later.
+### Module 4: Gold-Standard Experimental Evidence Benchmark (Critique 3)
+- [ ] **Task 4.1:** Partition `asmsg_edges.csv` into `Experimental_Gold_Standard` vs `Predicted_or_TextMined` subsets.
+- [ ] **Task 4.2:** Benchmark all baseline and GNN models on the `Experimental_Gold_Standard` subset to prevent circular training on legacy predictor outputs.
+
+### Module 5: Leakage-Controlled Negative Sampling & Ranking Suite (Critique 2)
+- [ ] **Task 5.1:** Implement **Degree-Matched Negative Sampling** and **Hard-Negative Sampling** in `src/evaluation/negative_sampling.py`.
+- [ ] **Task 5.2:** Implement **Full Candidate Ranking Protocol** (Top-K Accuracy, MRR, NDCG@K, Hits@K) against all unobserved candidate diseases per RNA.
 
 ---
 
-## 4. Multi-Agent Track Plan
+## 4. Present State vs. Gained State Comparison Matrix
+
+| Critique # | Domain | Present Pipeline (Before Fix) | Gained State (After Action Plan) | Methodological Gain / Impact |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Topology Leakage** | Sequence Similarity Edges | Static `ncrna_sequence_similarity_edges.csv` loaded globally across train/test nodes; single 0.85 threshold. | Dynamic per-split topology built **strictly on $\mathcal{V}_{\text{train}}$**; biotype-stratified & length-normalized TF-IDF cosine similarity. | **Zero cold-start data leakage**; valid U-S and U-U evaluation. |
+| **2. Negative Sampling** | Evaluation Protocol | Uniform random negative sampling from unobserved pairs; 1:1 balanced AUROC/AUPR. | **Degree-Matched & Hard Negative Sampling** + Full Candidate Ranking (MRR, NDCG@K, Hits@K against all unobserved diseases). | **Eliminates degree/popularity shortcut**; measures true biological prediction. |
+| **3. Evidence Circularity** | Edge Weighting & Evidence Type | Single composite $w_{ij}$ containing mixture of experimental and computational prediction scores. | Explicit `Evidence_Type` tagging (`Experimental` vs `Predicted`); evaluation on **Experimental Gold-Standard subset**. | **Eliminates circular reasoning** (no training on legacy predictor outputs). |
+| **4. Sequence Match Rate** | Alias & Synonym Resolution | Exact symbol string match against FASTA headers (8,421 symbols matched, 13.6%). | **HGNC / NCBI / RNAcentral Alias Resolution Engine** resolving deprecated symbols and transcript accessions. | Recovers long-tail ncRNAs; increases verified node coverage to estimated 12,000+ nodes. |
+| **5. Count Consistency** | Documentation & Funnel | Static manual documentation subject to revision drift. | **Programmatic Funnel Verification Script (`verify_dataset_funnel.py`)** executing directly against CSVs. | **0 manual discrepancy**; 100% reproducible statistical pipeline. |
+| **6. Disease Ontology** | Disease Normalization | Loose string regex stripping (`clean_name()`), risking false parent-child term collapses. | Exact **Disease Ontology `doid.obo` DAG & MeSH Tree mapping tables**. | **Preserves exact DO hierarchy**; enables hierarchy-aware cold-start splits. |
+| **7. Edge Metadata** | Master Edge Table Columns | `RNA Symbol`, `Disease_ID`, `Evidence_Count`, `PMID_List`, `Confidence_Score`, `Edge_Weight`. | Adds `Publication_Year`, `Evidence_Type`, `Stable_RNA_ID`, and `Dysregulation_Direction`. | Natively enables temporal splits and experimental filtering without runtime API calls. |
+| **8. Supplementary Modality** | Drug Interaction Data | Undocumented DrugBank snapshot. | **Explicit DrugBank provenance & licensing documentation**, or decoupled optional modality. | Compliance with open-science standards and DrugBank academic licensing terms. |
+
+---
+
+## 5. Phase-by-Phase Technical Execution Plan (Phases 2–5)
 
 ```
                   ┌─────────────────────────────────────────┐
