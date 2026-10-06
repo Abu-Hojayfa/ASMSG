@@ -15,12 +15,13 @@ This file is maintained by agents to store critical state, paths, decisions, and
 ## 2. Current Project State & Milestones
 
 ### Phase 1: Data Engine & Topology Overhaul (⏳ IN PROGRESS — DATASET PERFECTION FOCUS)
-- **Source Dataset**: RNADisease v4.0 (Gold Standard) + RNAcentral + miRBase v22 + GENCODE v44 + Ensembl 110 + circBase + piRBase.
-- **Strict Disease Ontology Resolution (Option B)**: Mapped 1,761 DO IDs and 1,862 MeSH IDs, strictly filtering out unmapped strings to achieve **1,304 100% ontology-curated Disease Ontology nodes** (965 DO IDs, 339 MeSH IDs, 0 unmapped strings).
-- **Sequence Resolution & Head-Tail Clamping**: Resolved **20,559 verified human ncRNA sequence nodes** across 6 biotype classes (lncRNA, circRNA, piRNA, miRNA, snoRNA, other_ncRNA) using Head-Tail dual-window clamping (first 511 nt + last 511 nt for long transcripts).
-- **Dual-Weighted Continuous Associations**: Formulated composite continuous edge weights \( w_{ij} = 0.5 w_{\text{PMID}} + 0.5 S_{\text{score}} \) (\( w_{ij} \in [0.2269, 0.9924] \), mean 0.3773) across **121,768 high-confidence edges**.
-- **ncRNA Topological Sequence Similarity Edges**: Generated **71,187 inter-ncRNA sequence similarity edges** (`ncrna_sequence_similarity_edges.csv`, 3-mer cosine similarity $\ge 0.85$) to connect degree-1 leaf nodes and enrich heterogeneous message passing.
-- **Single Master Dataset Export**: Exported single perfected master dataset to `datasets/asmsg_clean/` (`asmsg_nodes.csv`, `asmsg_diseases.csv`, `asmsg_edges.csv`, `ncrna_sequence_similarity_edges.csv`, `CURATION_POLICY.md`).
+- **Source Dataset**: RNADisease v4.0 (Gold Standard) + miRBase v22 + GENCODE v44 + Ensembl 110 + circBase + piRBase.
+- **Strict Disease Ontology Resolution (Option B)**: Mapped DO IDs and MeSH IDs, strictly filtering out unmapped strings to achieve **1,263 100% ontology-curated Disease Ontology nodes** (944 DO IDs, 319 MeSH IDs, 0 unmapped strings).
+- **Sequence Resolution & Head-Tail Clamping**: Resolved **8,421 verified human ncRNA sequence nodes** across biotype classes (lncRNA, miRNA, snoRNA, other_ncRNA) using Head-Tail dual-window clamping (first 511 nt + last 511 nt for long transcripts).
+- **Dual-Weighted Continuous Associations**: Formulated composite continuous edge weights \( w_{ij} = 0.5 w_{\text{PMID}} + 0.5 S_{\text{score}} \) (\( w_{ij} \in [0.2269, 0.9924] \), mean 0.3726) across **101,098 high-confidence edges**.
+- **ncRNA Topological Sequence Similarity Edges**: Generated **29,383 inter-ncRNA sequence similarity edges** (`ncrna_sequence_similarity_edges.csv`, 3-mer cosine similarity $\ge 0.85$) to connect degree-1 leaf nodes and enrich heterogeneous message passing.
+- **Single Master Dataset Export**: Exported single perfected master dataset to `datasets/asmsg_clean/` (`asmsg_nodes.csv`, `asmsg_diseases.csv`, `asmsg_edges.csv`, `ncrna_sequence_similarity_edges.csv`, `manual_audit_200_terms.csv`, `manual_audit_200_edges.csv`, `CURATION_POLICY.md`).
+- **Critical Codebase Audit Status**: 100% Resolved. Mature miRNA hairpin overwrite bug fixed (mature median 22 nt), garbage single/triple nt collisions eliminated (0 nodes $\le 5$ nt), disease `Total_Edges` discrepancy ratio fixed (1.0x across all 1,263 diseases).
 
 ### Phase 2: Multimodal Embedding Extraction Suite (📋 PLANNED)
 - Extract RNA-FM sequence embeddings, BioBERT & SapBERT disease embeddings, ChemBERTa-2 drug SMILES embeddings, and ablation feature vectors.
@@ -53,4 +54,4 @@ This file is maintained by agents to store critical state, paths, decisions, and
 | **GSLRDA** (2024) | miRNA+lncRNA (852) | 591 raw strings | GIP + Wang semantic | 5,424 binary | Transductive 5-fold CV (Leaky) |
 | **MIFNDRA** (2023) | miRNA (788) | 441 raw strings | GIP + sequence length | 5,149 binary | Transductive 5-fold CV (Leaky) |
 | **DMGAT** (2024) | miRNA (853) | 591 raw strings | Dual GAT on GIP | 5,424 binary | Transductive 5-fold CV (Leaky) |
-| **ASMSG Clean (Ours)** | **Spanning 6 Biotypes (20,973 nodes; 74.1% miRNA)** | **2,749 DO/MeSH Nodes (89.95% DOID row coverage)** | **RNA-FM (640d) + BioBERT (768d) + ChemBERTa-2 (384d) + Ablations** | **132,021 edges w/ PMID weights \( w_{ij} \) & confidence scores** | **Identity-Clustered & Hierarchy-Aware Disjoint Inductive Cold-Start (S-S, U-S, S-U, U-U) + Temporal Validation** |
+| **ASMSG Clean (Ours)** | **Spanning Multiple Biotypes (8,421 sequence nodes; 60.4% lncRNA, 37.5% miRNA)** | **1,263 DO/MeSH Nodes (944 DOID, 319 MeSH, 0 raw strings)** | **RNA-FM (640d) + BioBERT (768d) + ChemBERTa-2 (384d) + Ablations** | **130,481 total edges (101,098 ncRNA-Disease w/ PMID weights \( w_{ij} \) & confidence scores + 29,383 similarity edges)** | **Identity-Clustered & Hierarchy-Aware Disjoint Inductive Cold-Start (S-S, U-S, S-U, U-U) + Temporal Validation** |
